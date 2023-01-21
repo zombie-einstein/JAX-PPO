@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "PROJECT NAME"
+name = "jax_ppo"
 version = "0.1.0"
-description = "SOME DESCRIPTION"
+description = "JAX Implimentation of Proximal Policy Optimisation Algorithm"
 authors = []
 readme = "README.md"
-packages = [{include = "PACKAGE_NAME"}]
-homepage = "HOMEPAGE"
-repository = "REPOSITORY"
+packages = [{include = "jax_ppo"}]
+homepage = "https://github.com/zombie-einstein/JAX-PPO"
+repository = "https://github.com/zombie-einstein/JAX-PPO"
 keywords = []
 
 [tool.poetry.dependencies]

@@ -1,7 +1,6 @@
-# python-project-template
+# JAX-PPO
 
-Template Repo for Python Projects
-
+JAX Implementation of Proximal Policy Optimisation Algorithm
 
 ## Developers
 
