@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "jax_ppo"
+name = "jax-ppo"
 version = "0.1.0"
 description = "JAX Implimentation of Proximal Policy Optimisation Algorithm"
 authors = ["zombie-einstein <zombie-einstein@proton.me>"]
