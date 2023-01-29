@@ -1,5 +1,6 @@
 import typing
 
+import flax
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -27,10 +28,13 @@ def init_agent(
     observation_space_shape: typing.Tuple[int, ...],
     schedule: typing.Union[float, optax._src.base.Schedule],
     layer_width: int = 64,
+    activation: flax.linen.activation = flax.linen.relu,
 ) -> typing.Tuple[jax.random.PRNGKey, TrainState]:
 
     policy = ActorCritic(
-        layer_width=layer_width, single_action_shape=np.prod(action_space_shape)
+        layer_width=layer_width,
+        single_action_shape=np.prod(action_space_shape),
+        activation=activation,
     )
 
     tx = optax.chain(

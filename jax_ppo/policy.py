@@ -12,20 +12,21 @@ def _layer_init(scale: float = np.sqrt(2)):
 class ActorCritic(linen.module.Module):
     layer_width: int
     single_action_shape: int
+    activation: linen.activation
 
     @linen.compact
     def __call__(self, x):
 
         value = linen.Dense(self.layer_width, **_layer_init())(x)
-        value = linen.tanh(value)
+        value = self.activation(value)
         value = linen.Dense(self.layer_width, **_layer_init())(value)
-        value = linen.tanh(value)
+        value = self.activation(value)
         value = linen.Dense(1, **_layer_init(scale=1.0))(value)
 
         mean = linen.Dense(self.layer_width, **_layer_init())(x)
-        mean = linen.tanh(mean)
+        mean = self.activation(mean)
         mean = linen.Dense(self.layer_width, **_layer_init())(mean)
-        mean = linen.tanh(mean)
+        mean = self.activation(mean)
         mean = linen.Dense(self.single_action_shape, **_layer_init(scale=0.01))(mean)
 
         log_std = self.param(
