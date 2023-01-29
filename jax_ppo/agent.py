@@ -5,9 +5,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
-from flax.training.train_state import TrainState
 
-from .data_types import PPOParams
+from .data_types import Agent, PPOParams
 from .policy import ActorCritic
 
 default_params = PPOParams(
@@ -29,7 +28,7 @@ def init_agent(
     schedule: typing.Union[float, optax._src.base.Schedule],
     layer_width: int = 64,
     activation: flax.linen.activation = flax.linen.relu,
-) -> typing.Tuple[jax.random.PRNGKey, TrainState]:
+) -> typing.Tuple[jax.random.PRNGKey, Agent]:
 
     policy = ActorCritic(
         layer_width=layer_width,
@@ -49,6 +48,6 @@ def init_agent(
     key, sub_key = jax.random.split(key)
     params_model = policy.init(sub_key, fake_args_model)
 
-    agent = TrainState.create(apply_fn=policy.apply, params=params_model, tx=tx)
+    agent = Agent.create(apply_fn=policy.apply, params=params_model, tx=tx)
 
     return key, agent

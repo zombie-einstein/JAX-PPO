@@ -3,16 +3,15 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-from flax.training.train_state import TrainState
 
 from .algos import calculate_gae, calculate_losses
-from .data_types import Batch, PPOParams, Trajectory
+from .data_types import Agent, Batch, PPOParams, Trajectory
 
 
 @partial(jax.jit, static_argnames="batch_size")
 def policy_update(
-    agent: TrainState, ppo_params: PPOParams, batch: Batch, batch_size: int
-) -> typing.Tuple[TrainState, jnp.array]:
+    agent: Agent, ppo_params: PPOParams, batch: Batch, batch_size: int
+) -> typing.Tuple[Agent, jnp.array]:
 
     n_batches = batch.action.shape[0] // batch_size
     batches = jax.tree_util.tree_map(
@@ -21,7 +20,7 @@ def policy_update(
 
     grad_fn = jax.value_and_grad(calculate_losses, has_aux=True)
 
-    def train(_agent: TrainState, mini_batch: Batch):
+    def train(_agent: Agent, mini_batch: Batch):
         (_, _losses), grads = grad_fn(
             _agent.params, _agent.apply_fn, mini_batch, ppo_params
         )
@@ -44,8 +43,8 @@ def train_step(
     max_mini_batches: int,
     ppo_params: PPOParams,
     trajectories: Trajectory,
-    agent: TrainState,
-) -> typing.Tuple[jax.random.PRNGKey, TrainState, typing.Dict]:
+    agent: Agent,
+) -> typing.Tuple[jax.random.PRNGKey, Agent, typing.Dict]:
 
     gae, target = calculate_gae(ppo_params, trajectories)
     batch = Batch(
