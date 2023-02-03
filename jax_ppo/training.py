@@ -33,6 +33,18 @@ def policy_update(
     return agent, losses
 
 
+def prepare_batch(ppo_params: PPOParams, trajectories: Trajectory) -> Batch:
+    gae, target = calculate_gae(ppo_params, trajectories)
+    return Batch(
+        state=trajectories.state,
+        action=trajectories.action,
+        value=trajectories.value,
+        log_likelihood=trajectories.log_likelihood,
+        gae=gae,
+        target=target,
+    )
+
+
 @partial(
     jax.jit, static_argnames=("update_epochs", "mini_batch_size", "max_mini_batches")
 )
@@ -42,19 +54,9 @@ def train_step(
     mini_batch_size: int,
     max_mini_batches: int,
     ppo_params: PPOParams,
-    trajectories: Trajectory,
+    batch: Batch,
     agent: Agent,
 ) -> typing.Tuple[jax.random.PRNGKey, Agent, typing.Dict]:
-
-    gae, target = calculate_gae(ppo_params, trajectories)
-    batch = Batch(
-        state=trajectories.state,
-        action=trajectories.action,
-        value=trajectories.value,
-        log_likelihood=trajectories.log_likelihood,
-        gae=gae,
-        target=target,
-    )
 
     batch_size = batch.state.shape[0]
     n_samples = batch_size - (batch_size % mini_batch_size)

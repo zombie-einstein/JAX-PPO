@@ -73,13 +73,15 @@ def train(
             next_done=jnp.array(dones[1:]),
         )
 
+        batch = jax_ppo.prepare_batch(jax_ppo.default_params, trajectories)
+
         key, agent, losses = jax_ppo.train_step(
             key,
             n_train_epochs,
             mini_batch_size,
             1_000,
             jax_ppo.default_params,
-            trajectories,
+            batch,
             agent,
         )
 
