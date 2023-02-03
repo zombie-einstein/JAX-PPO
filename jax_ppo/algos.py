@@ -3,9 +3,8 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-from flax.training.train_state import TrainState
 
-from .data_types import Batch, PPOParams, Trajectory
+from .data_types import Agent, Batch, PPOParams, Trajectory
 
 
 def calculate_gae(
@@ -51,8 +50,8 @@ def _policy(apply_fn, params, state):
     return mean, log_std, value
 
 
-def sample_actions(key: jax.random.PRNGKey, train_state: TrainState, state):
-    mean, log_std, value = _policy(train_state.apply_fn, train_state.params, state)
+def sample_actions(key: jax.random.PRNGKey, agent: Agent, state):
+    mean, log_std, value = _policy(agent.apply_fn, agent.params, state)
 
     std = jnp.exp(log_std)
     key, sub_key = jax.random.split(key)
@@ -63,8 +62,8 @@ def sample_actions(key: jax.random.PRNGKey, train_state: TrainState, state):
     return key, actions, log_likelihood, jnp.squeeze(value)
 
 
-def max_action(train_state: TrainState, state):
-    mean, log_std, value = _policy(train_state.apply_fn, train_state.params, state)
+def max_action(agent: Agent, state):
+    mean, log_std, value = _policy(agent.apply_fn, agent.params, state)
     return mean
 
 
@@ -98,7 +97,7 @@ def calculate_losses(params, apply_fn, batch: Batch, ppo_params: PPOParams):
     v_loss = 0.5 * jnp.mean(v_loss, axis=0)
 
     # Entropy Loss
-    entropy = -jnp.mean(jnp.exp(new_log_likelihood) * new_log_likelihood, axis=0)
+    entropy = jnp.mean(-jnp.exp(new_log_likelihood) * new_log_likelihood, axis=0)
 
     total_loss = (
         p_loss + ppo_params.critic_coeff * v_loss - ppo_params.entropy_coeff * entropy
