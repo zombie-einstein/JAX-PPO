@@ -4,6 +4,9 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
+from jax_ppo.ppo_lstm.algos import calculate_losses as calculate_losses_lstm
+from jax_ppo.ppo_lstm.data_types import Batch as LSTMBatch
+
 from .algos import calculate_gae, calculate_losses
 from .data_types import Agent, Batch, PPOParams, Trajectory
 
@@ -18,7 +21,11 @@ def policy_update(
         lambda x: x.reshape((n_batches, batch_size) + x.shape[1:]), batch
     )
 
-    grad_fn = jax.value_and_grad(calculate_losses, has_aux=True)
+    # Specialise if we are training an LSTM policy or not
+    if type(batch) == LSTMBatch:
+        grad_fn = jax.value_and_grad(calculate_losses_lstm, has_aux=True)
+    else:
+        grad_fn = jax.value_and_grad(calculate_losses, has_aux=True)
 
     def train(_agent: Agent, mini_batch: Batch):
         (_, _losses), grads = grad_fn(

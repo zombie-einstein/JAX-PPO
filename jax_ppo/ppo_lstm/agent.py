@@ -1,13 +1,13 @@
 import typing
 
-import flax
 import jax
 import jax.numpy as jnp
 import numpy as np
 import optax
+from flax import linen
 
-from .data_types import Agent, PPOParams
-from .policy import ActorCritic
+from .data_types import Agent, HiddenState, PPOParams
+from .policy import RecurrentActorCritic, initialise_carry
 
 
 def init_agent(
@@ -16,12 +16,15 @@ def init_agent(
     action_space_shape: typing.Tuple[int, ...],
     observation_space_shape: typing.Tuple[int, ...],
     schedule: typing.Union[float, optax._src.base.Schedule],
-    layer_width: int = 64,
-    activation: flax.linen.activation = flax.linen.relu,
-) -> typing.Tuple[jax.random.PRNGKey, Agent]:
+    seq_len: int,
+    n_batch: int,
+    activation: linen.activation = linen.tanh,
+) -> typing.Tuple[jax.random.PRNGKey, Agent, HiddenState]:
 
-    policy = ActorCritic(
-        layer_width=layer_width,
+    observation_size = np.prod(observation_space_shape)
+
+    policy = RecurrentActorCritic(
+        layer_width=observation_size,
         single_action_shape=np.prod(action_space_shape),
         activation=activation,
     )
@@ -32,12 +35,19 @@ def init_agent(
             learning_rate=schedule, eps=ppo_params.adam_eps
         ),
     )
+    fake_args_model = jnp.zeros(
+        (
+            n_batch,
+            seq_len,
+        )
+        + observation_space_shape
+    )
 
-    fake_args_model = jnp.zeros(observation_space_shape)
+    hidden_states = initialise_carry((n_batch,), observation_size)
 
     key, sub_key = jax.random.split(key)
-    params_model = policy.init(sub_key, fake_args_model)
+    params_model = policy.init(sub_key, fake_args_model, hidden_states)
 
     agent = Agent.create(apply_fn=policy.apply, params=params_model, tx=tx)
 
-    return key, agent
+    return key, agent, hidden_states
