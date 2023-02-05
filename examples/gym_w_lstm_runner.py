@@ -7,20 +7,19 @@ import numpy as np
 from tqdm import auto
 
 import jax_ppo
-from jax_ppo import ppo_lstm
 
 
 def train(
     key: jax.random.PRNGKey,
     env: gym.Env,
-    agent: ppo_lstm.Agent,
-    hidden_state: ppo_lstm.HiddenState,
+    agent: jax_ppo.Agent,
+    hidden_state: jax_ppo.HiddenState,
     n_train: int,
     n_samples: int,
     n_train_epochs: int,
     mini_batch_size: int,
     seq_length: int,
-) -> typing.Tuple[jax.random.PRNGKey, ppo_lstm.Agent, typing.Dict]:
+) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.Agent, typing.Dict]:
 
     n_steps = n_train * n_samples * n_train_epochs // mini_batch_size
 
@@ -61,9 +60,13 @@ def train(
 
             obs = jnp.array(observation)[jnp.newaxis]
 
-            key, action, log_likelihood, value, hidden_state = ppo_lstm.sample_actions(
-                key, agent, obs, hidden_state
-            )
+            (
+                key,
+                action,
+                log_likelihood,
+                value,
+                hidden_state,
+            ) = jax_ppo.sample_lstm_action(key, agent, obs, hidden_state)
 
             new_obs, reward, terminated, truncated, _ = env.step(np.array(action[0]))
 
@@ -82,12 +85,12 @@ def train(
 
         hidden_states = jnp.array(hidden_states)
 
-        hidden_states = ppo_lstm.data_types.HiddenState(
+        hidden_states = jax_ppo.HiddenState(
             actor=(hidden_states[:-1, 0, 0, 0], hidden_states[:-1, 0, 1, 0]),
             critic=(hidden_states[:-1, 1, 0, 0], hidden_states[:-1, 1, 1, 0]),
         )
 
-        trajectories = ppo_lstm.Trajectory(
+        trajectories = jax_ppo.LSTMTrajectory(
             state=jnp.array(observations[:-1]),
             action=jnp.array(actions[:-1]),
             log_likelihood=jnp.array(log_likelihoods[:-1]),
@@ -98,7 +101,7 @@ def train(
             hidden_states=hidden_states,
         )
 
-        batch = ppo_lstm.prepare_batch(jax_ppo.default_params, trajectories)
+        batch = jax_ppo.prepare_lstm_batch(jax_ppo.default_params, trajectories)
 
         key, agent, losses = jax_ppo.train_step(
             key,

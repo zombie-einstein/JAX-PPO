@@ -4,75 +4,28 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from .data_types import Agent, Batch, PPOParams, Trajectory
-
-
-def calculate_gae(
-    ppo_params: PPOParams, trajectories: Trajectory
-) -> typing.Tuple[jnp.array, jnp.array]:
-
-    buffer_size = trajectories.value.shape[0]
-    delta = (
-        trajectories.reward
-        + ppo_params.gamma * trajectories.next_value * (1.0 - trajectories.next_done)
-        - trajectories.value
-    )
-
-    gae = jnp.zeros_like(delta)
-    gae = gae.at[-1].set(delta[-1])
-
-    def set_gae(i, g):
-        j = buffer_size - 2 - i
-        g = g.at[j].set(
-            delta[j]
-            + ppo_params.gamma
-            * ppo_params.gae_lambda
-            * (1 - trajectories.next_done[j])
-            * g[j + 1]
-        )
-        return g
-
-    gae = jax.lax.fori_loop(0, buffer_size - 1, set_gae, gae)
-
-    return gae, gae + trajectories.value
-
-
-def gaussian_likelihood(sample, mean, log_std):
-    std = jnp.exp(log_std)
-    return -0.5 * (
-        jnp.square((sample - mean) / (std + 1e-8)) + 2 * log_std + jnp.log(2 * jnp.pi)
-    )
+from jax_ppo.data_types import PPOParams
+from jax_ppo.lstm.algos import policy as lstm_policy
+from jax_ppo.lstm.data_types import LSTMBatch
+from jax_ppo.mlp.algos import policy
+from jax_ppo.mlp.data_types import Batch
+from jax_ppo.utils import gaussian_likelihood
 
 
 @partial(jax.jit, static_argnames="apply_fn")
-def _policy(apply_fn, params, state):
-    mean, log_std, value = apply_fn(params, state)
-    return mean, log_std, value
-
-
-def sample_actions(key: jax.random.PRNGKey, agent: Agent, state):
-    mean, log_std, value = _policy(agent.apply_fn, agent.params, state)
-
-    std = jnp.exp(log_std)
-    key, sub_key = jax.random.split(key)
-    actions = mean + jax.random.normal(sub_key, mean.shape) * std
-
-    log_likelihood = jnp.sum(gaussian_likelihood(actions, mean, log_std), axis=-1)
-
-    return key, actions, log_likelihood, jnp.squeeze(value)
-
-
-def max_action(agent: Agent, state):
-    mean, log_std, value = _policy(agent.apply_fn, agent.params, state)
-    return mean
-
-
-@partial(jax.jit, static_argnames="apply_fn")
-def calculate_losses(params, apply_fn, batch: Batch, ppo_params: PPOParams):
+def calculate_losses(
+    params, apply_fn, batch: typing.Union[Batch, LSTMBatch], ppo_params: PPOParams
+):
 
     clip_coeff = ppo_params.clip_coeff
 
-    mean, log_std, new_value = _policy(apply_fn, params, batch.state)
+    if type(batch) == LSTMBatch:
+        mean, log_std, new_value, _ = lstm_policy(
+            apply_fn, params, batch.state, batch.hidden_states
+        )
+    else:
+        mean, log_std, new_value = policy(apply_fn, params, batch.state)
+
     new_value = jnp.squeeze(new_value)
 
     new_log_likelihood = jnp.sum(

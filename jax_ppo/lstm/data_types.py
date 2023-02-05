@@ -1,13 +1,8 @@
 from collections import namedtuple
 
-from flax.training.train_state import TrainState
-
-# Just rename this type to reflect usage
-Agent = TrainState
-
 HiddenState = namedtuple("HiddenState", ["actor", "critic"])
 
-Trajectory = namedtuple(
+LSTMTrajectory = namedtuple(
     "Trajectory",
     [
         "state",
@@ -21,7 +16,7 @@ Trajectory = namedtuple(
     ],
 )
 
-Batch = namedtuple(
+LSTMBatch = namedtuple(
     "Batch",
     [
         "state",
@@ -31,18 +26,5 @@ Batch = namedtuple(
         "gae",
         "target",
         "hidden_states",
-    ],
-)
-
-PPOParams = namedtuple(
-    "PPOParams",
-    [
-        "gamma",
-        "gae_lambda",
-        "critic_coeff",
-        "entropy_coeff",
-        "clip_coeff",
-        "max_grad_norm",
-        "adam_eps",
     ],
 )

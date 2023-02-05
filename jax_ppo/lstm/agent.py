@@ -6,11 +6,13 @@ import numpy as np
 import optax
 from flax import linen
 
-from .data_types import Agent, HiddenState, PPOParams
+from jax_ppo.data_types import Agent, PPOParams
+
+from .data_types import HiddenState
 from .policy import RecurrentActorCritic, initialise_carry
 
 
-def init_agent(
+def init_lstm_agent(
     key: jax.random.PRNGKey,
     ppo_params: PPOParams,
     action_space_shape: typing.Tuple[int, ...],

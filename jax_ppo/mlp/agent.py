@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
-from .data_types import Agent, PPOParams
-from .policy import ActorCritic
+from jax_ppo.data_types import Agent, PPOParams
+from jax_ppo.mlp.policy import ActorCritic
 
 
 def init_agent(

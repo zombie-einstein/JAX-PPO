@@ -3,7 +3,7 @@ from functools import partial
 import jax
 from flax import linen
 
-from jax_ppo.policy import _layer_init
+from jax_ppo.mlp.policy import layer_init
 
 from .data_types import HiddenState
 
@@ -31,14 +31,14 @@ class RecurrentActorCritic(linen.Module):
     def __call__(self, x, hidden_states: HiddenState):
 
         (critic_carry, critic_hidden), _ = _LSTMLayer()(hidden_states.critic, x)
-        value = linen.Dense(self.layer_width, **_layer_init())(critic_hidden)
+        value = linen.Dense(self.layer_width, **layer_init())(critic_hidden)
         value = self.activation(value)
-        value = linen.Dense(1, **_layer_init(scale=1.0))(value)
+        value = linen.Dense(1, **layer_init(scale=1.0))(value)
 
         (actor_carry, actor_hidden), _ = _LSTMLayer()(hidden_states.actor, x)
-        mean = linen.Dense(self.layer_width, **_layer_init())(actor_hidden)
+        mean = linen.Dense(self.layer_width, **layer_init())(actor_hidden)
         mean = self.activation(mean)
-        mean = linen.Dense(self.single_action_shape, **_layer_init(scale=0.01))(mean)
+        mean = linen.Dense(self.single_action_shape, **layer_init(scale=0.01))(mean)
 
         log_std = self.param(
             "log_std", linen.initializers.zeros, (self.single_action_shape,)
