@@ -6,18 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 
-from .data_types import Agent, PPOParams
-from .policy import ActorCritic
-
-default_params = PPOParams(
-    gamma=0.95,
-    gae_lambda=0.95,
-    critic_coeff=0.5,
-    entropy_coeff=0.001,
-    clip_coeff=0.2,
-    max_grad_norm=0.75,
-    adam_eps=1e-8,
-)
+from jax_ppo.data_types import Agent, PPOParams
+from jax_ppo.mlp.policy import ActorCritic
 
 
 def init_agent(

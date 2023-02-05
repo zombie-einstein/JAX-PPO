@@ -4,13 +4,18 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from .algos import calculate_gae, calculate_losses
-from .data_types import Agent, Batch, PPOParams, Trajectory
+from jax_ppo.algos import calculate_losses
+from jax_ppo.data_types import Agent, PPOParams
+from jax_ppo.lstm.data_types import LSTMBatch
+from jax_ppo.mlp.data_types import Batch
 
 
 @partial(jax.jit, static_argnames="batch_size")
 def policy_update(
-    agent: Agent, ppo_params: PPOParams, batch: Batch, batch_size: int
+    agent: Agent,
+    ppo_params: PPOParams,
+    batch: typing.Union[Batch, LSTMBatch],
+    batch_size: int,
 ) -> typing.Tuple[Agent, jnp.array]:
 
     n_batches = batch.action.shape[0] // batch_size
@@ -42,19 +47,9 @@ def train_step(
     mini_batch_size: int,
     max_mini_batches: int,
     ppo_params: PPOParams,
-    trajectories: Trajectory,
+    batch: typing.Union[Batch, LSTMBatch],
     agent: Agent,
 ) -> typing.Tuple[jax.random.PRNGKey, Agent, typing.Dict]:
-
-    gae, target = calculate_gae(ppo_params, trajectories)
-    batch = Batch(
-        state=trajectories.state,
-        action=trajectories.action,
-        value=trajectories.value,
-        log_likelihood=trajectories.log_likelihood,
-        gae=gae,
-        target=target,
-    )
 
     batch_size = batch.state.shape[0]
     n_samples = batch_size - (batch_size % mini_batch_size)

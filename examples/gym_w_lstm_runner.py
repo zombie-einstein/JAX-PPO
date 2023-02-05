@@ -4,7 +4,6 @@ import gymnasium as gym
 import jax
 import jax.numpy as jnp
 import numpy as np
-from flax.training.train_state import TrainState
 from tqdm import auto
 
 import jax_ppo
@@ -13,12 +12,14 @@ import jax_ppo
 def train(
     key: jax.random.PRNGKey,
     env: gym.Env,
-    agent: TrainState,
+    agent: jax_ppo.Agent,
+    hidden_state: jax_ppo.HiddenState,
     n_train: int,
     n_samples: int,
     n_train_epochs: int,
     mini_batch_size: int,
-) -> typing.Tuple[jax.random.PRNGKey, TrainState, typing.Dict]:
+    seq_length: int,
+) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.Agent, typing.Dict]:
 
     n_steps = n_train * n_samples * n_train_epochs // mini_batch_size
 
@@ -32,38 +33,64 @@ def train(
 
     for _ in auto.trange(n_train):
 
-        observation, _ = env.reset()
-
         observations = []
         actions = []
         values = []
         log_likelihoods = []
         rewards = []
         dones = []
+        hidden_states = []
+
+        def initial_observation():
+            _obs, _ = env.reset()
+            _observation = [_obs]
+
+            for i in range(seq_length - 1):
+                _obs, _, _, _, _ = env.step(np.zeros(1))
+                _observation.append(_obs)
+
+            return _observation
+
+        observation = initial_observation()
 
         for _ in range(n_samples + 1):
 
             observations.append(observation)
+            hidden_states.append(hidden_state)
 
-            key, action, log_likelihood, value = jax_ppo.sample_actions(
-                key, agent, observation
-            )
+            obs = jnp.array(observation)[jnp.newaxis]
 
-            observation, reward, terminated, truncated, _ = env.step(np.array(action))
+            (
+                key,
+                action,
+                log_likelihood,
+                value,
+                hidden_state,
+            ) = jax_ppo.sample_lstm_action(key, agent, obs, hidden_state)
 
-            actions.append(action)
-            values.append(value)
-            log_likelihoods.append(log_likelihood)
+            new_obs, reward, terminated, truncated, _ = env.step(np.array(action[0]))
+
+            observation = observation[1:] + [new_obs]
+
+            actions.append(action[0])
+            values.append(value[0])
+            log_likelihoods.append(log_likelihood[0])
             rewards.append(reward)
 
             done = terminated or truncated
-
             dones.append(done)
 
             if done:
-                observation, _ = env.reset()
+                observation = initial_observation()
 
-        trajectories = jax_ppo.Trajectory(
+        hidden_states = jnp.array(hidden_states)
+
+        hidden_states = jax_ppo.HiddenState(
+            actor=(hidden_states[:-1, 0, 0, 0], hidden_states[:-1, 0, 1, 0]),
+            critic=(hidden_states[:-1, 1, 0, 0], hidden_states[:-1, 1, 1, 0]),
+        )
+
+        trajectories = jax_ppo.LSTMTrajectory(
             state=jnp.array(observations[:-1]),
             action=jnp.array(actions[:-1]),
             log_likelihood=jnp.array(log_likelihoods[:-1]),
@@ -71,9 +98,10 @@ def train(
             next_value=jnp.array(values[1:]),
             reward=jnp.array(rewards[:-1]),
             next_done=jnp.array(dones[1:]),
+            hidden_states=hidden_states,
         )
 
-        batch = jax_ppo.prepare_batch(jax_ppo.default_params, trajectories)
+        batch = jax_ppo.prepare_lstm_batch(jax_ppo.default_params, trajectories)
 
         key, agent, losses = jax_ppo.train_step(
             key,
@@ -91,20 +119,3 @@ def train(
     total_losses = {k: jnp.array(v).reshape(n_steps) for k, v in total_losses.items()}
 
     return key, agent, total_losses
-
-
-def test(env: gym.Env, agent: TrainState, n_steps: int) -> np.array:
-
-    observation, _ = env.reset()
-    rewards = np.zeros(n_steps)
-
-    for i in range(n_steps):
-
-        action = jax_ppo.max_action(agent, observation)
-        observation, reward, terminated, truncated, _ = env.step(np.array(action))
-        rewards[i] = reward
-
-        if terminated or truncated:
-            observation, _ = env.reset()
-
-    return rewards
