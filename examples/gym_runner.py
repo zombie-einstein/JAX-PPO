@@ -1,110 +1,158 @@
 import typing
+from functools import partial
 
-import gymnasium as gym
 import jax
 import jax.numpy as jnp
-import numpy as np
+import jax_tqdm
 from flax.training.train_state import TrainState
-from tqdm import auto
 
 import jax_ppo
 
 
+def _generate_samples(
+    key: jax.random.PRNGKey,
+    env,
+    env_params,
+    agent: jax_ppo.Agent,
+    n_samples: int,
+    ppo_params: jax_ppo.PPOParams,
+):
+    def _sample_step(carry, _):
+        k, _agent, _state, _observation = carry
+        k, _action, _log_likelihood, _value = jax_ppo.sample_actions(
+            k, agent, _observation
+        )
+        k, k_step = jax.random.split(k)
+        new_observation, new_state, _reward, _done, _ = env.step(
+            k_step, _state, _action, env_params
+        )
+        new_observation, new_state = jax.lax.cond(
+            _done,
+            lambda: env.reset(k, env_params),
+            lambda: (new_observation, new_state),
+        )
+
+        return (
+            (k, _agent, new_state, new_observation),
+            (_observation, _action, _log_likelihood, _value, _reward[0], _done),
+        )
+
+    key, reset_key = jax.random.split(key)
+    observation, state = env.reset(reset_key, env_params)
+
+    (key, agent, state, observation), samples = jax.lax.scan(
+        _sample_step, (key, agent, state, observation), None, length=n_samples + 1
+    )
+
+    trajectories = jax_ppo.Trajectory(
+        state=samples[0].at[:-1].get(),
+        action=samples[1].at[:-1].get(),
+        log_likelihood=samples[2].at[:-1].get(),
+        value=samples[3].at[:-1].get(),
+        next_value=samples[3].at[1:].get(),
+        reward=samples[4].at[:-1].get(),
+        next_done=samples[5].at[1:].get(),
+    )
+
+    return jax_ppo.prepare_batch(ppo_params, trajectories)
+
+
+def test_policy(
+    key: jax.random.PRNGKey,
+    env,
+    env_params,
+    agent: jax_ppo.Agent,
+    n_steps: int,
+    greedy_policy: bool = False,
+):
+    def _step(carry, _):
+        k, _agent, _state, _observation = carry
+
+        if greedy_policy:
+            _action = jax_ppo.max_action(agent, _observation)
+        else:
+            k, _action, _log_likelihood, _value = jax_ppo.sample_actions(
+                k, agent, _observation
+            )
+        k, k_step = jax.random.split(k)
+        new_observation, new_state, _reward, _done, _ = env.step(
+            k_step, _state, _action, env_params
+        )
+        new_observation, new_state = jax.lax.cond(
+            _done,
+            lambda: env.reset(k, env_params),
+            lambda: (new_observation, new_state),
+        )
+
+        return (
+            (k, _agent, new_state, new_observation),
+            (_observation, _reward[0]),
+        )
+
+    key, reset_key = jax.random.split(key)
+    observation, state = env.reset(reset_key, env_params)
+
+    (key, agent, state, observation), records = jax.lax.scan(
+        _step, (key, agent, state, observation), None, length=n_steps
+    )
+
+    return records
+
+
+@partial(
+    jax.jit,
+    static_argnames=(
+        "env",
+        "n_train",
+        "n_samples",
+        "n_train_epochs",
+        "mini_batch_size",
+        "n_test_steps",
+        "greedy_test_policy",
+    ),
+)
 def train(
     key: jax.random.PRNGKey,
-    env: gym.Env,
+    env,
+    env_params,
     agent: TrainState,
     n_train: int,
     n_samples: int,
     n_train_epochs: int,
     mini_batch_size: int,
-) -> typing.Tuple[jax.random.PRNGKey, TrainState, typing.Dict]:
+    n_test_steps: int,
+    ppo_params: jax_ppo.PPOParams,
+    greedy_test_policy: bool = False,
+) -> typing.Tuple[jax.random.PRNGKey, TrainState, typing.Dict, jnp.array, jnp.array]:
+    @jax_tqdm.scan_tqdm(n_train)
+    def _train_step(carry, i):
+        _key, _agent = carry
 
-    n_steps = n_train * n_samples * n_train_epochs // mini_batch_size
+        batch = _generate_samples(_key, env, env_params, _agent, n_samples, ppo_params)
 
-    total_losses = {
-        "entropy": [],
-        "learning_rate": [],
-        "loss": [],
-        "policy_loss": [],
-        "value_loss": [],
-    }
-
-    for _ in auto.trange(n_train):
-
-        observation, _ = env.reset()
-
-        observations = []
-        actions = []
-        values = []
-        log_likelihoods = []
-        rewards = []
-        dones = []
-
-        for _ in range(n_samples + 1):
-
-            observations.append(observation)
-
-            key, action, log_likelihood, value = jax_ppo.sample_actions(
-                key, agent, observation
-            )
-
-            observation, reward, terminated, truncated, _ = env.step(np.array(action))
-
-            actions.append(action)
-            values.append(value)
-            log_likelihoods.append(log_likelihood)
-            rewards.append(reward)
-
-            done = terminated or truncated
-
-            dones.append(done)
-
-            if done:
-                observation, _ = env.reset()
-
-        trajectories = jax_ppo.Trajectory(
-            state=jnp.array(observations[:-1]),
-            action=jnp.array(actions[:-1]),
-            log_likelihood=jnp.array(log_likelihoods[:-1]),
-            value=jnp.array(values[:-1]),
-            next_value=jnp.array(values[1:]),
-            reward=jnp.array(rewards[:-1]),
-            next_done=jnp.array(dones[1:]),
-        )
-
-        batch = jax_ppo.prepare_batch(jax_ppo.default_params, trajectories)
-
-        key, agent, losses = jax_ppo.train_step(
-            key,
+        _key, _agent, _losses = jax_ppo.train_step(
+            _key,
             n_train_epochs,
             mini_batch_size,
             1_000,
-            jax_ppo.default_params,
+            ppo_params,
             batch,
-            agent,
+            _agent,
         )
 
-        for k, v in losses.items():
-            total_losses[k].append(v)
+        _ts, _rewards = test_policy(
+            _key,
+            env,
+            env_params,
+            _agent,
+            n_test_steps,
+            greedy_policy=greedy_test_policy,
+        )
 
-    total_losses = {k: jnp.array(v).reshape(n_steps) for k, v in total_losses.items()}
+        return (_key, _agent), (_losses, _ts, _rewards)
 
-    return key, agent, total_losses
+    (key, agent), (losses, ts, rewards) = jax.lax.scan(
+        _train_step, (key, agent), jnp.arange(n_train)
+    )
 
-
-def test(env: gym.Env, agent: TrainState, n_steps: int) -> np.array:
-
-    observation, _ = env.reset()
-    rewards = np.zeros(n_steps)
-
-    for i in range(n_steps):
-
-        action = jax_ppo.max_action(agent, observation)
-        observation, reward, terminated, truncated, _ = env.step(np.array(action))
-        rewards[i] = reward
-
-        if terminated or truncated:
-            observation, _ = env.reset()
-
-    return rewards
+    return key, agent, losses, ts, rewards

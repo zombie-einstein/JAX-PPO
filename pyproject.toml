@@ -19,7 +19,8 @@ taskipy = "^1.10.3"
 pytest = "^7.2.1"
 jupyter = "^1.0.0"
 tqdm = "^4.64.1"
-gymnasium = {extras = ["classic-control"], version = "^0.27.1"}
+gymnax = "^0.0.5"
+jax-tqdm = "^0.1.0"
 
 [build-system]
 requires = ["poetry-core"]
