@@ -12,30 +12,26 @@ def calculate_gae(
     ppo_params: PPOParams, trajectories: typing.Union[Trajectory, LSTMTrajectory]
 ) -> typing.Tuple[jnp.array, jnp.array]:
 
-    buffer_size = trajectories.value.shape[0]
+    terminals = (1.0 - trajectories.done).at[:-1].get()
+
     delta = (
-        trajectories.reward
-        + ppo_params.gamma * trajectories.next_value * (1.0 - trajectories.next_done)
-        - trajectories.value
+        trajectories.reward.at[:-1].get()
+        + ppo_params.gamma * trajectories.value.at[1:].get() * terminals
+        - trajectories.value.at[:-1].get()
     )
 
-    gae = jnp.zeros_like(delta)
-    gae = gae.at[-1].set(delta[-1])
+    def _adv_scan(carry, vals):
+        _delta, _terminal = vals
+        gae = _delta + _terminal * ppo_params.gamma * ppo_params.gae_lambda * carry
+        return gae, gae
 
-    def set_gae(i, g):
-        j = buffer_size - 2 - i
-        g = g.at[j].set(
-            delta[j]
-            + ppo_params.gamma
-            * ppo_params.gae_lambda
-            * (1 - trajectories.next_done[j])
-            * g[j + 1]
-        )
-        return g
+    _, advantages = jax.lax.scan(
+        _adv_scan, 0.0, (jnp.flip(delta, axis=0), jnp.flip(terminals, axis=0))
+    )
+    advantages = jnp.flip(advantages)
+    returns = advantages + trajectories.value[:-1]
 
-    gae = jax.lax.fori_loop(0, buffer_size - 1, set_gae, gae)
-
-    return gae, gae + trajectories.value
+    return advantages, returns
 
 
 def gaussian_likelihood(sample, mean, log_std):

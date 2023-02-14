@@ -9,9 +9,8 @@ LSTMTrajectory = namedtuple(
         "action",
         "log_likelihood",
         "value",
-        "next_value",
         "reward",
-        "next_done",
+        "done",
         "hidden_states",
     ],
 )
@@ -23,8 +22,8 @@ LSTMBatch = namedtuple(
         "action",
         "value",
         "log_likelihood",
-        "gae",
-        "target",
+        "adv",
+        "returns",
         "hidden_states",
     ],
 )

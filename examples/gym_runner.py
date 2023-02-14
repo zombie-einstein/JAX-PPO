@@ -34,24 +34,21 @@ def _generate_samples(
 
         return (
             (k, _agent, new_state, new_observation),
-            (_observation, _action, _log_likelihood, _value, _reward[0], _done),
+            jax_ppo.Trajectory(
+                state=_observation,
+                action=_action,
+                log_likelihood=_log_likelihood,
+                value=_value,
+                reward=_reward[0],
+                done=_done,
+            ),
         )
 
     key, reset_key = jax.random.split(key)
     observation, state = env.reset(reset_key, env_params)
 
-    (key, agent, state, observation), samples = jax.lax.scan(
+    (key, agent, state, observation), trajectories = jax.lax.scan(
         _sample_step, (key, agent, state, observation), None, length=n_samples + 1
-    )
-
-    trajectories = jax_ppo.Trajectory(
-        state=samples[0].at[:-1].get(),
-        action=samples[1].at[:-1].get(),
-        log_likelihood=samples[2].at[:-1].get(),
-        value=samples[3].at[:-1].get(),
-        next_value=samples[3].at[1:].get(),
-        reward=samples[4].at[:-1].get(),
-        next_done=samples[5].at[1:].get(),
     )
 
     return jax_ppo.prepare_batch(ppo_params, trajectories)

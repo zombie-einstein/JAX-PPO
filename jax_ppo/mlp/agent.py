@@ -17,7 +17,7 @@ def init_agent(
     observation_space_shape: typing.Tuple[int, ...],
     schedule: typing.Union[float, optax._src.base.Schedule],
     layer_width: int = 64,
-    activation: flax.linen.activation = flax.linen.relu,
+    activation: flax.linen.activation = flax.linen.tanh,
 ) -> typing.Tuple[jax.random.PRNGKey, Agent]:
 
     policy = ActorCritic(

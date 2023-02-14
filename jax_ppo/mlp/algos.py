@@ -32,12 +32,12 @@ def max_action(agent: Agent, state):
 
 
 def prepare_batch(ppo_params: PPOParams, trajectories: Trajectory) -> Batch:
-    gae, target = calculate_gae(ppo_params, trajectories)
+    adv, returns = calculate_gae(ppo_params, trajectories)
     return Batch(
-        state=trajectories.state,
-        action=trajectories.action,
-        value=trajectories.value,
-        log_likelihood=trajectories.log_likelihood,
-        gae=gae,
-        target=target,
+        state=trajectories.state.at[:-1].get(),
+        action=trajectories.action.at[:-1].get(),
+        value=trajectories.value.at[:-1].get(),
+        log_likelihood=trajectories.log_likelihood.at[:-1].get(),
+        adv=adv,
+        returns=returns,
     )

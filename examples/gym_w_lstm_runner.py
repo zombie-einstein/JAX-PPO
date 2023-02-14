@@ -67,38 +67,26 @@ def _generate_samples(
 
         return (
             (k, _agent, new_hidden_state, new_state, new_observation),
-            (
-                _observation,
-                _action,
-                _log_likelihood,
-                _value,
-                _reward[0],
-                _done,
-                _hidden_state,
+            jax_ppo.LSTMTrajectory(
+                state=_observation,
+                action=_action,
+                log_likelihood=_log_likelihood,
+                value=_value,
+                reward=_reward[0],
+                done=_done,
+                hidden_states=_hidden_state,
             ),
         )
 
     key, observation, state, hidden_state = _reset_env(key, env, env_params, seq_len)
 
-    (key, agent, hidden_state, state, observation), samples = jax.lax.scan(
+    (key, agent, hidden_state, state, observation), trajectories = jax.lax.scan(
         _sample_step,
         (key, agent, hidden_state, state, observation),
         None,
         length=n_samples + 1,
     )
 
-    hidden_states = jax.tree_util.tree_map(lambda x: x.at[:-1, 0].get(), samples[6])
-
-    trajectories = jax_ppo.LSTMTrajectory(
-        state=samples[0].at[:-1, 0].get(),
-        action=samples[1].at[:-1, 0].get(),
-        log_likelihood=samples[2].at[:-1, 0].get(),
-        value=samples[3].at[:-1, 0].get(),
-        next_value=samples[3].at[1:, 0].get(),
-        reward=samples[4].at[:-1, 0].get(),
-        next_done=samples[5].at[1:].get(),
-        hidden_states=hidden_states,
-    )
     batch = jax_ppo.prepare_lstm_batch(ppo_params, trajectories)
     return batch
 

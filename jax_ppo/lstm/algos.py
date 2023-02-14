@@ -42,13 +42,18 @@ def max_action(agent: Agent, state, hidden_states: HiddenState):
 
 
 def prepare_batch(ppo_params: PPOParams, trajectories: LSTMTrajectory) -> LSTMBatch:
-    gae, target = calculate_gae(ppo_params, trajectories)
+    adv, returns = calculate_gae(ppo_params, trajectories)
+
+    hidden_states = jax.tree_util.tree_map(
+        lambda x: x.at[:-1].get(), trajectories.hidden_states
+    )
+
     return LSTMBatch(
-        state=trajectories.state,
-        action=trajectories.action,
-        value=trajectories.value,
-        log_likelihood=trajectories.log_likelihood,
-        gae=gae,
-        target=target,
-        hidden_states=trajectories.hidden_states,
+        state=trajectories.state.at[:-1].get(),
+        action=trajectories.action.at[:-1].get(),
+        value=trajectories.value.at[:-1].get(),
+        log_likelihood=trajectories.log_likelihood.at[:-1].get(),
+        adv=adv,
+        returns=returns,
+        hidden_states=hidden_states,
     )

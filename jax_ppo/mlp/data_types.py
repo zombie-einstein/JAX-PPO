@@ -2,7 +2,7 @@ from collections import namedtuple
 
 Trajectory = namedtuple(
     "Trajectory",
-    ["state", "action", "log_likelihood", "value", "next_value", "reward", "next_done"],
+    ["state", "action", "log_likelihood", "value", "reward", "done"],
 )
 
 Batch = namedtuple(
@@ -12,7 +12,7 @@ Batch = namedtuple(
         "action",
         "value",
         "log_likelihood",
-        "gae",
-        "target",
+        "adv",
+        "returns",
     ],
 )

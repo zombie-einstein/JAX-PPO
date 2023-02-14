@@ -32,22 +32,27 @@ def calculate_losses(
         gaussian_likelihood(batch.action, mean, log_std), axis=-1
     )
 
-    ratio = jnp.exp(new_log_likelihood - batch.log_likelihood)
-    gae = (batch.gae - jnp.mean(batch.gae)) / (jnp.std(batch.gae) + 1e-8)
+    log_ratio = new_log_likelihood - batch.log_likelihood
+    ratio = jnp.exp(log_ratio)
+
+    adv = (batch.adv - jnp.mean(batch.adv)) / (jnp.std(batch.adv) + 1e-8)
 
     # Policy Loss
-    p_loss_1 = -gae * ratio
-    p_loss_2 = -gae * jnp.clip(ratio, a_min=1 - clip_coeff, a_max=1 + clip_coeff)
-    p_loss = jnp.mean(jnp.maximum(p_loss_1, p_loss_2), axis=0)
+    p_loss_1 = adv * ratio
+    p_loss_2 = adv * jnp.clip(ratio, a_min=1 - clip_coeff, a_max=1 + clip_coeff)
+    p_loss = -jnp.mean(jnp.minimum(p_loss_1, p_loss_2), axis=0)
 
     # Value Loss
-    v_loss_unclipped = jnp.square(new_value - batch.target)
+    v_loss_unclipped = jnp.square(new_value - batch.returns)
     v_loss_clipped = batch.value + jnp.clip(
         new_value - batch.value, a_min=-clip_coeff, a_max=clip_coeff
     )
-    v_loss_clipped = jnp.square(v_loss_clipped - batch.target)
-    v_loss = jnp.minimum(v_loss_unclipped, v_loss_clipped)
+    v_loss_clipped = jnp.square(v_loss_clipped - batch.returns)
+    v_loss = jnp.maximum(v_loss_unclipped, v_loss_clipped)
     v_loss = 0.5 * jnp.mean(v_loss, axis=0)
+
+    # Approximate KL-Divergence
+    approx_kl = jnp.mean(ratio - 1.0 - log_ratio)
 
     # Entropy Loss
     entropy = jnp.mean(-jnp.exp(new_log_likelihood) * new_log_likelihood, axis=0)
@@ -63,5 +68,6 @@ def calculate_losses(
             "value_loss": v_loss,
             "entropy": entropy,
             "loss": total_loss,
+            "kl_divergence": approx_kl,
         },
     )
