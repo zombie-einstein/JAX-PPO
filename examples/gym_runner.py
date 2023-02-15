@@ -51,7 +51,8 @@ def _generate_samples(
         _sample_step, (key, agent, state, observation), None, length=n_samples + 1
     )
 
-    return jax_ppo.prepare_batch(ppo_params, trajectories)
+    batch = jax_ppo.prepare_batch(ppo_params, trajectories)
+    return key, batch
 
 
 def test_policy(
@@ -93,7 +94,7 @@ def test_policy(
         _step, (key, agent, state, observation), None, length=n_steps
     )
 
-    return records
+    return key, records[0], records[1]
 
 
 @partial(
@@ -125,7 +126,9 @@ def train(
     def _train_step(carry, i):
         _key, _agent = carry
 
-        batch = _generate_samples(_key, env, env_params, _agent, n_samples, ppo_params)
+        _key, batch = _generate_samples(
+            _key, env, env_params, _agent, n_samples, ppo_params
+        )
 
         _key, _agent, _losses = jax_ppo.train_step(
             _key,
@@ -137,7 +140,7 @@ def train(
             _agent,
         )
 
-        _ts, _rewards = test_policy(
+        _key, _ts, _rewards = test_policy(
             _key,
             env,
             env_params,

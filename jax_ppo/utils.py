@@ -26,7 +26,9 @@ def calculate_gae(
         return gae, gae
 
     _, advantages = jax.lax.scan(
-        _adv_scan, 0.0, (jnp.flip(delta, axis=0), jnp.flip(terminals, axis=0))
+        _adv_scan,
+        0.0,
+        (jnp.flip(delta, axis=0), jnp.flip(terminals, axis=0)),
     )
     advantages = jnp.flip(advantages)
     returns = advantages + trajectories.value[:-1]

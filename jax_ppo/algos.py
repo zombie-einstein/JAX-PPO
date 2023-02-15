@@ -55,7 +55,11 @@ def calculate_losses(
     approx_kl = jnp.mean(ratio - 1.0 - log_ratio)
 
     # Entropy Loss
-    entropy = jnp.mean(-jnp.exp(new_log_likelihood) * new_log_likelihood, axis=0)
+    entropy = log_std + 0.5 * jnp.log(2 * jnp.pi * jnp.e)
+
+    if jnp.ndim(entropy) > 1:
+        entropy = jnp.sum(entropy, axis=1)
+    entropy = jnp.mean(entropy, axis=0)
 
     total_loss = (
         p_loss + ppo_params.critic_coeff * v_loss - ppo_params.entropy_coeff * entropy
