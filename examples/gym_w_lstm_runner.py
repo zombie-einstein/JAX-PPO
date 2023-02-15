@@ -73,7 +73,7 @@ def _generate_samples(
                 log_likelihood=_log_likelihood,
                 value=_value,
                 reward=_reward[0],
-                done=_done,
+                done=_done[jnp.newaxis],
                 hidden_states=_hidden_state,
             ),
         )
@@ -88,7 +88,11 @@ def _generate_samples(
     )
 
     batch = jax_ppo.prepare_lstm_batch(ppo_params, trajectories)
-    return batch
+
+    # TODO: Need to remove batch axes here? Can this be pulled into batch processing?
+    batch = jax.tree_util.tree_map(lambda x: x[:, 0], batch)
+
+    return key, batch
 
 
 def test_policy(
@@ -139,7 +143,7 @@ def test_policy(
         _step, (key, agent, hidden_state, state, observation), None, length=n_steps
     )
 
-    return records
+    return key, records[0], records[1]
 
 
 @partial(
@@ -173,7 +177,7 @@ def train(
     def _train_step(carry, _):
         _key, _agent = carry
 
-        batch = _generate_samples(
+        _key, batch = _generate_samples(
             _key, env, env_params, _agent, n_samples, seq_len, ppo_params
         )
 
@@ -187,7 +191,7 @@ def train(
             _agent,
         )
 
-        _ts, _rewards = test_policy(
+        _key, _ts, _rewards = test_policy(
             _key,
             env,
             env_params,

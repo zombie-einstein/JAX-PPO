@@ -27,7 +27,7 @@ def calculate_gae(
 
     _, advantages = jax.lax.scan(
         _adv_scan,
-        0.0,
+        jnp.zeros(terminals.shape[1:]),
         (jnp.flip(delta, axis=0), jnp.flip(terminals, axis=0)),
     )
     advantages = jnp.flip(advantages)
