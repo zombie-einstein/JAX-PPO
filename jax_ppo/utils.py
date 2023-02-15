@@ -14,10 +14,13 @@ def calculate_gae(
 
     terminals = (1.0 - trajectories.done).at[:-1].get()
 
+    values = trajectories.value.at[:-1].get()
+    next_values = trajectories.value.at[1:].get()
+
     delta = (
         trajectories.reward.at[:-1].get()
-        + ppo_params.gamma * trajectories.value.at[1:].get() * terminals
-        - trajectories.value.at[:-1].get()
+        + ppo_params.gamma * next_values * terminals
+        - values
     )
 
     def _adv_scan(carry, vals):
@@ -30,8 +33,8 @@ def calculate_gae(
         jnp.zeros(terminals.shape[1:]),
         (jnp.flip(delta, axis=0), jnp.flip(terminals, axis=0)),
     )
-    advantages = jnp.flip(advantages)
-    returns = advantages + trajectories.value[:-1]
+    advantages = jnp.flip(advantages, axis=0)
+    returns = advantages + values
 
     return advantages, returns
 
