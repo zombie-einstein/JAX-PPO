@@ -1,9 +1,9 @@
 # JAX-PPO
 
 JAX (using [flax](https://flax.readthedocs.io/en/latest/)) Implementation of
-Proximal Policy Optimisation Algorithm.
+Proximal Policy Optimisation Algorithm, designed for continuous action spaces.
 
-The base implementation is based around the
+The base implementation is largely based around the
 [cleanrl implementation](https://github.com/vwxyzjn/cleanrl/blob/master/cleanrl/ppo.py)
 and the recurrent implementation using LSTM motivated by these blogs:
 

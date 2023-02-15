@@ -4,7 +4,6 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import jax_tqdm
-from flax.training.train_state import TrainState
 
 import jax_ppo
 
@@ -16,7 +15,23 @@ def _generate_samples(
     agent: jax_ppo.Agent,
     n_samples: int,
     ppo_params: jax_ppo.PPOParams,
-):
+) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.Batch]:
+    """
+    Generate batch of trajectories from an agent an environment.
+
+    Args:
+        key: JAX random key
+        env: Gymnax environment
+        env_params: Gymnax environment parameters
+        agent: JAX-PPO agent
+        n_samples: Number of samples to generate
+        ppo_params: PPO training parameters
+
+    Returns:
+        - JAX random key
+        - Batch of trajectories
+    """
+
     def _sample_step(carry, _):
         k, _agent, _state, _observation = carry
         k, _action, _log_likelihood, _value = jax_ppo.sample_actions(
@@ -63,6 +78,23 @@ def test_policy(
     n_steps: int,
     greedy_policy: bool = False,
 ):
+    """
+    Test a given agent policy against the environment.
+
+    Args:
+        key: JAX random key
+        env: Gymnax training environment
+        env_params: Gymnax environment parameters
+        agent: JAX-PPO agent
+        n_steps: Number of test steps
+        greedy_policy: If ``True`` testing will greedily sample actions.
+
+    Returns:
+        - Updated JAX random key
+        - Reward time series
+        - Trajectory time series
+    """
+
     def _step(carry, _):
         k, _agent, _state, _observation = carry
 
@@ -113,7 +145,7 @@ def train(
     key: jax.random.PRNGKey,
     env,
     env_params,
-    agent: TrainState,
+    agent: jax_ppo.Agent,
     n_train: int,
     n_samples: int,
     n_train_epochs: int,
@@ -121,7 +153,33 @@ def train(
     n_test_steps: int,
     ppo_params: jax_ppo.PPOParams,
     greedy_test_policy: bool = False,
-) -> typing.Tuple[jax.random.PRNGKey, TrainState, typing.Dict, jnp.array, jnp.array]:
+) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.Agent, typing.Dict, jnp.array, jnp.array]:
+    """
+    Train PPO agent in a Gymnax environment.
+
+    Args:
+        key: JAX random key
+        env: Gymnax environment
+        env_params: Gymnax environment parameters
+        agent: PPO agent
+        n_train: Number of training steps (i.e. where we draw samples from an
+            updated policy)
+        n_samples: Number of training samples to gather each train step
+        n_train_epochs: Number of training epochs to run per train step
+        mini_batch_size: Size of mini-batches drawn from each batch
+        n_test_steps: Number of steps to run during testing phase
+        ppo_params: PPO training parameters
+        greedy_test_policy: If ``True`` actions will be greedily sampled
+            during the testing phase
+
+    Returns:
+        - Updated JAX random key
+        - Trained PPO agent
+        - Dictionary of training data
+        - Time-series of trajectories generated during testing
+        - Reward time-series generate during testing
+    """
+
     @jax_tqdm.scan_tqdm(n_train)
     def _train_step(carry, i):
         _key, _agent = carry

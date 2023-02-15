@@ -50,6 +50,25 @@ def train_step(
     batch: typing.Union[Batch, LSTMBatch],
     agent: Agent,
 ) -> typing.Tuple[jax.random.PRNGKey, Agent, typing.Dict]:
+    """
+    Update policy based on a batch of trajectories
+
+    Args:
+        key: JAX random key
+        update_epochs: Number of training epochs run for this batch
+        mini_batch_size: Size of mini batch samples for this batch
+        max_mini_batches: Maximum number of mini-batches, used to clip the
+            number of mini-batches during training where the batch size is
+            very large,
+        ppo_params: PPO training parameters
+        batch: Batch of PPO training examples, should be flattened across the samples
+        agent: PPO agent training state and policy
+
+    Returns:
+        - Updated JAX random key
+        - Updated PPO agent
+        - Dictionary of training metrics gathered over training process
+    """
 
     batch_size = batch.state.shape[0]
     n_samples = batch_size - (batch_size % mini_batch_size)

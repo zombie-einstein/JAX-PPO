@@ -4,7 +4,6 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import jax_tqdm
-from flax.training.train_state import TrainState
 
 import jax_ppo
 
@@ -163,7 +162,7 @@ def train(
     key: jax.random.PRNGKey,
     env,
     env_params,
-    agent: TrainState,
+    agent: jax_ppo.Agent,
     n_train: int,
     n_samples: int,
     n_train_epochs: int,
@@ -172,7 +171,7 @@ def train(
     seq_len: int,
     ppo_params: jax_ppo.PPOParams,
     greedy_test_policy: bool = False,
-) -> typing.Tuple[jax.random.PRNGKey, TrainState, typing.Dict, jnp.array, jnp.array]:
+) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.Agent, typing.Dict, jnp.array, jnp.array]:
     @jax_tqdm.scan_tqdm(n_train)
     def _train_step(carry, _):
         _key, _agent = carry
