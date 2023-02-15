@@ -21,6 +21,13 @@ Dependencies can be installed with [poetry](https://python-poetry.org/) by runni
 poetry install
 ```
 
+## TODO
+
+- Early stopping based on the KL-divergence is not implemented.
+- Training assumes a Gaussian distribution for the output of the policy. Would
+  be nice to use a probabilistic programming package to make this more flexible.
+- Benchmark against other reference implementations.
+
 ## Developers
 
 ### Pre-Commit Hooks
