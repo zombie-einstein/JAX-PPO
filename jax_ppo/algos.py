@@ -16,7 +16,7 @@ from jax_ppo.utils import gaussian_likelihood
 def calculate_losses(
     params, apply_fn, batch: typing.Union[Batch, LSTMBatch], ppo_params: PPOParams
 ):
-
+    batch = jax.lax.stop_gradient(batch)
     clip_coeff = ppo_params.clip_coeff
 
     if type(batch) == LSTMBatch:
