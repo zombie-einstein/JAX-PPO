@@ -35,10 +35,3 @@ def calculate_gae(
     returns = advantages + values
 
     return advantages, returns
-
-
-def gaussian_likelihood(sample, mean, log_std):
-    std = jnp.exp(log_std)
-    return -0.5 * (
-        jnp.square((sample - mean) / (std + 1e-8)) + 2 * log_std + jnp.log(2 * jnp.pi)
-    )

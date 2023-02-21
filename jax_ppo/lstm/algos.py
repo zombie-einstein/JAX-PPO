@@ -1,10 +1,11 @@
 from functools import partial
 
+import distrax
 import jax
 import jax.numpy as jnp
 
 from jax_ppo.data_types import Agent, PPOParams
-from jax_ppo.utils import calculate_gae, gaussian_likelihood
+from jax_ppo.utils import calculate_gae
 
 from .data_types import HiddenState, LSTMBatch, LSTMTrajectory
 
@@ -25,11 +26,9 @@ def sample_actions(
         agent.apply_fn, agent.params, state, hidden_states
     )
 
-    std = jnp.exp(log_std)
     key, sub_key = jax.random.split(key)
-    actions = mean + jax.random.normal(sub_key, mean.shape) * std
-
-    log_likelihood = jnp.sum(gaussian_likelihood(actions, mean, log_std), axis=-1)
+    dist = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
+    actions, log_likelihood = dist.sample_and_log_prob(seed=sub_key)
 
     return key, actions, log_likelihood, value, hidden_states
 

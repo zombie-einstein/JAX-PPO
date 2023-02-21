@@ -1,6 +1,7 @@
 import typing
 from functools import partial
 
+import distrax
 import jax
 import jax.numpy as jnp
 
@@ -9,7 +10,6 @@ from jax_ppo.lstm.algos import policy as lstm_policy
 from jax_ppo.lstm.data_types import LSTMBatch
 from jax_ppo.mlp.algos import policy
 from jax_ppo.mlp.data_types import Batch
-from jax_ppo.utils import gaussian_likelihood
 
 
 @partial(jax.jit, static_argnames="apply_fn")
@@ -28,9 +28,8 @@ def calculate_losses(
 
     new_value = jnp.squeeze(new_value)
 
-    new_log_likelihood = jnp.sum(
-        gaussian_likelihood(batch.action, mean, log_std), axis=-1
-    )
+    dist = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
+    new_log_likelihood = dist.log_prob(batch.action)
 
     log_ratio = new_log_likelihood - batch.log_likelihood
     ratio = jnp.exp(log_ratio)
@@ -55,11 +54,7 @@ def calculate_losses(
     approx_kl = jnp.mean(ratio - 1.0 - log_ratio)
 
     # Entropy Loss
-    entropy = log_std + 0.5 * jnp.log(2 * jnp.pi * jnp.e)
-
-    if jnp.ndim(entropy) > 1:
-        entropy = jnp.sum(entropy, axis=1)
-    entropy = jnp.mean(entropy, axis=0)
+    entropy = jnp.mean(dist.entropy())
 
     total_loss = (
         p_loss + ppo_params.critic_coeff * v_loss - ppo_params.entropy_coeff * entropy
