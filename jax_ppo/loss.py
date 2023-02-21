@@ -54,10 +54,12 @@ def calculate_losses(
     approx_kl = jnp.mean(ratio - 1.0 - log_ratio)
 
     # Entropy Loss
-    entropy = jnp.mean(dist.entropy())
+    entropy_loss = jnp.mean(dist.entropy())
 
     total_loss = (
-        p_loss + ppo_params.critic_coeff * v_loss - ppo_params.entropy_coeff * entropy
+        p_loss
+        + ppo_params.critic_coeff * v_loss
+        - ppo_params.entropy_coeff * entropy_loss
     )
 
     return (
@@ -65,8 +67,8 @@ def calculate_losses(
         {
             "policy_loss": p_loss,
             "value_loss": v_loss,
-            "entropy": entropy,
-            "loss": total_loss,
+            "entropy_loss": entropy_loss,
+            "total_loss": total_loss,
             "kl_divergence": approx_kl,
         },
     )

@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from jax_ppo.data_types import Agent, PPOParams
-from jax_ppo.utils import calculate_gae
+from jax_ppo.gae import calculate_gae
 
 from .data_types import HiddenState, LSTMBatch, LSTMTrajectory
 

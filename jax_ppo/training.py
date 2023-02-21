@@ -4,8 +4,8 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from jax_ppo.algos import calculate_losses
 from jax_ppo.data_types import Agent, PPOParams
+from jax_ppo.loss import calculate_losses
 from jax_ppo.lstm.data_types import LSTMBatch
 from jax_ppo.mlp.data_types import Batch
 
