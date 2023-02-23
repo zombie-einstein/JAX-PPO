@@ -4,14 +4,15 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import jax_tqdm
+from gymnax.environments import environment
 
 import jax_ppo
 
 
 def _generate_samples(
     key: jax.random.PRNGKey,
-    env,
-    env_params,
+    env: environment.Environment,
+    env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
     n_samples: int,
     ppo_params: jax_ppo.PPOParams,
@@ -35,7 +36,7 @@ def _generate_samples(
     def _sample_step(carry, _):
         k, _agent, _state, _observation = carry
         k, _action, _log_likelihood, _value = jax_ppo.sample_actions(
-            k, agent, _observation
+            k, _agent, _observation
         )
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
@@ -72,8 +73,8 @@ def _generate_samples(
 
 def test_policy(
     key: jax.random.PRNGKey,
-    env,
-    env_params,
+    env: environment.Environment,
+    env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
     n_steps: int,
     greedy_policy: bool = False,
@@ -99,10 +100,10 @@ def test_policy(
         k, _agent, _state, _observation = carry
 
         if greedy_policy:
-            _action = jax_ppo.max_action(agent, _observation)
+            _action = jax_ppo.max_action(_agent, _observation)
         else:
             k, _action, _log_likelihood, _value = jax_ppo.sample_actions(
-                k, agent, _observation
+                k, _agent, _observation
             )
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
@@ -143,8 +144,8 @@ def test_policy(
 )
 def train(
     key: jax.random.PRNGKey,
-    env,
-    env_params,
+    env: environment.Environment,
+    env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
     n_train: int,
     n_samples: int,
@@ -181,7 +182,7 @@ def train(
     """
 
     @jax_tqdm.scan_tqdm(n_train)
-    def _train_step(carry, i):
+    def _train_step(carry, _):
         _key, _agent = carry
 
         _key, batch = _generate_samples(

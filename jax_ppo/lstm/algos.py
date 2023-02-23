@@ -13,7 +13,7 @@ from .data_types import HiddenState, LSTMBatch, LSTMTrajectory
 @partial(jax.jit, static_argnames="apply_fn")
 def policy(apply_fn, params, state, hidden_states: HiddenState):
     mean, log_std, value, hidden_states = apply_fn(params, state, hidden_states)
-    return mean, log_std, value[:, 0], hidden_states
+    return mean, log_std, value, hidden_states
 
 
 def sample_actions(
@@ -25,12 +25,10 @@ def sample_actions(
     mean, log_std, value, hidden_states = policy(
         agent.apply_fn, agent.params, state, hidden_states
     )
-
     key, sub_key = jax.random.split(key)
     dist = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
     actions, log_likelihood = dist.sample_and_log_prob(seed=sub_key)
-
-    return key, actions, log_likelihood, value, hidden_states
+    return key, actions, log_likelihood, value[:, 0], hidden_states
 
 
 def max_action(agent: Agent, state, hidden_states: HiddenState):

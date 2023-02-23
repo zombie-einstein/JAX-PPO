@@ -4,11 +4,17 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 import jax_tqdm
+from gymnax.environments import environment
 
 import jax_ppo
 
 
-def _reset_env(key: jax.random.PRNGKey, env, env_params, seq_len: int):
+def _reset_env(
+    key: jax.random.PRNGKey,
+    env: environment.Environment,
+    env_params: environment.EnvParams,
+    seq_len: int,
+):
 
     obs_size = env.observation_space(env_params).shape[0]
 
@@ -33,8 +39,8 @@ def _reset_env(key: jax.random.PRNGKey, env, env_params, seq_len: int):
 
 def _generate_samples(
     key: jax.random.PRNGKey,
-    env,
-    env_params,
+    env: environment.Environment,
+    env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
     n_samples: int,
     seq_len: int,
@@ -48,7 +54,7 @@ def _generate_samples(
             _log_likelihood,
             _value,
             new_hidden_state,
-        ) = jax_ppo.sample_lstm_actions(k, agent, _observation, _hidden_state)
+        ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
             k_step, _state, _action, env_params
@@ -96,8 +102,8 @@ def _generate_samples(
 
 def test_policy(
     key: jax.random.PRNGKey,
-    env,
-    env_params,
+    env: environment.Environment,
+    env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
     n_steps: int,
     seq_len: int,
@@ -107,7 +113,9 @@ def test_policy(
         k, _agent, _hidden_state, _state, _observation = carry
 
         if greedy_policy:
-            _action = jax_ppo.max_lstm_action(agent, _observation, _hidden_state)
+            _action, new_hidden_state = jax_ppo.max_lstm_action(
+                _agent, _observation, _hidden_state
+            )
         else:
             (
                 k,
@@ -115,7 +123,7 @@ def test_policy(
                 _log_likelihood,
                 _value,
                 new_hidden_state,
-            ) = jax_ppo.sample_lstm_actions(k, agent, _observation, _hidden_state)
+            ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
             k_step, _state, _action, env_params
@@ -160,8 +168,8 @@ def test_policy(
 )
 def train(
     key: jax.random.PRNGKey,
-    env,
-    env_params,
+    env: environment.Environment,
+    env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
     n_train: int,
     n_samples: int,
