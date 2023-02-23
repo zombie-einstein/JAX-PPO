@@ -26,7 +26,6 @@ def init_lstm_agent(
     observation_size = np.prod(observation_space_shape)
 
     policy = RecurrentActorCritic(
-        layer_width=observation_size,
         single_action_shape=np.prod(action_space_shape),
         activation=activation,
     )

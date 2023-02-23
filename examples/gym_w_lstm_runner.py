@@ -17,11 +17,13 @@ def _reset_env(
 ):
 
     obs_size = env.observation_space(env_params).shape[0]
+    # action_shape = env.action_space(env_params).shape
 
     def step(carry, _):
         _observation, _state, k = carry
         k, k1, k2 = jax.random.split(k, 3)
         _action = env.action_space(env_params).sample(k1)
+        # _action = jnp.zeros(action_shape)
         new_observation, new_state, _, _, _ = env.step(k2, _state, _action, env_params)
         return (new_observation, new_state, k), new_observation
 
@@ -93,7 +95,6 @@ def _generate_samples(
     )
 
     batch = jax_ppo.prepare_lstm_batch(ppo_params, trajectories)
-
     # TODO: Need to remove batch axes here? Can this be pulled into batch processing?
     batch = jax.tree_util.tree_map(lambda x: x[:, 0], batch)
 
@@ -128,6 +129,7 @@ def test_policy(
         new_observation, new_state, _reward, _done, _ = env.step(
             k_step, _state, _action, env_params
         )
+
         new_observation = jnp.hstack(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
         )
