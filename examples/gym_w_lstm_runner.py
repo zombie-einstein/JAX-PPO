@@ -29,10 +29,6 @@ def _reset_env(
     env_params: environment.EnvParams,
     seq_len: int,
 ):
-
-    obs_size = env.observation_space(env_params).shape[0]
-    # action_shape = env.action_space(env_params).shape
-
     def step(carry, _):
         _observation, _state, k = carry
         k, k1, k2 = jax.random.split(k, 3)
@@ -48,9 +44,7 @@ def _reset_env(
         step, (observation, state, key), None, length=seq_len
     )
 
-    hidden_state = jax_ppo.initialise_carry((1,), obs_size)
-
-    return key, observations[jnp.newaxis], state, hidden_state
+    return key, observations[jnp.newaxis], state
 
 
 def _generate_samples(
@@ -58,12 +52,14 @@ def _generate_samples(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
+    hidden_state: jax_ppo.HiddenStates,
     n_samples: int,
     seq_len: int,
     ppo_params: jax_ppo.PPOParams,
-):
+) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.HiddenStates, jax_ppo.LSTMBatch]:
     def _sample_step(carry, _):
         k, _agent, _hidden_state, _state, _observation = carry
+
         (
             k,
             _action,
@@ -71,6 +67,7 @@ def _generate_samples(
             _value,
             new_hidden_state,
         ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
+
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
             k_step, _state, _action, env_params
@@ -79,10 +76,10 @@ def _generate_samples(
         new_observation = jnp.hstack(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
         )
-        k, new_observation, new_state, new_hidden_state = jax.lax.cond(
+        k, new_observation, new_state = jax.lax.cond(
             _done,
             lambda _k: _reset_env(_k, env, env_params, seq_len),
-            lambda _k: (_k, new_observation, new_state, new_hidden_state),
+            lambda _k: (_k, new_observation, new_state),
             k,
         )
 
@@ -99,7 +96,7 @@ def _generate_samples(
             ),
         )
 
-    key, observation, state, hidden_state = _reset_env(key, env, env_params, seq_len)
+    key, observation, state = _reset_env(key, env, env_params, seq_len)
 
     (key, agent, hidden_state, state, observation), trajectories = jax.lax.scan(
         _sample_step,
@@ -112,7 +109,7 @@ def _generate_samples(
     # TODO: Need to remove batch axes here? Can this be pulled into batch processing?
     batch = jax.tree_util.tree_map(lambda x: x[:, 0], batch)
 
-    return key, batch
+    return key, hidden_state, batch
 
 
 def test_policy(
@@ -120,6 +117,7 @@ def test_policy(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
+    hidden_state: jax_ppo.HiddenStates,
     n_steps: int,
     seq_len: int,
     greedy_policy: bool = False,
@@ -139,6 +137,7 @@ def test_policy(
                 _value,
                 new_hidden_state,
             ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
+
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
             k_step, _state, _action, env_params
@@ -148,10 +147,10 @@ def test_policy(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
         )
 
-        k, new_observation, new_state, new_hidden_state = jax.lax.cond(
+        k, new_observation, new_state = jax.lax.cond(
             _done,
             lambda _k: _reset_env(_k, env, env_params, seq_len),
-            lambda _k: (_k, new_observation, new_state, new_hidden_state),
+            lambda _k: (_k, new_observation, new_state),
             k,
         )
 
@@ -160,7 +159,11 @@ def test_policy(
             (_observation, _reward[0]),
         )
 
-    key, observation, state, hidden_state = _reset_env(key, env, env_params, seq_len)
+    (
+        key,
+        observation,
+        state,
+    ) = _reset_env(key, env, env_params, seq_len)
 
     (key, agent, hidden_state, state, observation), records = jax.lax.scan(
         _step, (key, agent, hidden_state, state, observation), None, length=n_steps
@@ -187,6 +190,7 @@ def train(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
+    hidden_state: jax_ppo.HiddenStates,
     n_train: int,
     n_samples: int,
     n_train_epochs: int,
@@ -195,13 +199,20 @@ def train(
     seq_len: int,
     ppo_params: jax_ppo.PPOParams,
     greedy_test_policy: bool = False,
-) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.Agent, typing.Dict, jnp.array, jnp.array]:
+) -> typing.Tuple[
+    jax.random.PRNGKey,
+    jax_ppo.Agent,
+    jax_ppo.HiddenStates,
+    typing.Dict,
+    jnp.array,
+    jnp.array,
+]:
     @jax_tqdm.scan_tqdm(n_train)
     def _train_step(carry, _):
-        _key, _agent = carry
+        _key, _agent, _hidden_state = carry
 
-        _key, batch = _generate_samples(
-            _key, env, env_params, _agent, n_samples, seq_len, ppo_params
+        _key, _hidden_state, batch = _generate_samples(
+            _key, env, env_params, _agent, _hidden_state, n_samples, seq_len, ppo_params
         )
 
         _key, _agent, _losses = jax_ppo.train_step(
@@ -219,15 +230,16 @@ def train(
             env,
             env_params,
             _agent,
+            _hidden_state,
             n_test_steps,
             seq_len,
             greedy_policy=greedy_test_policy,
         )
 
-        return (_key, _agent), (_losses, _ts, _rewards)
+        return (_key, _agent, _hidden_state), (_losses, _ts, _rewards)
 
-    (key, agent), (losses, ts, rewards) = jax.lax.scan(
-        _train_step, (key, agent), jnp.arange(n_train)
+    (key, agent, hidden_state), (losses, ts, rewards) = jax.lax.scan(
+        _train_step, (key, agent, hidden_state), jnp.arange(n_train)
     )
 
-    return key, agent, losses, ts, rewards
+    return key, agent, hidden_state, losses, ts, rewards

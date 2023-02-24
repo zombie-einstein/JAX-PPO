@@ -4,9 +4,8 @@ from functools import partial
 import jax
 from flax import linen
 
+from jax_ppo.lstm.data_types import HiddenStates
 from jax_ppo.mlp.policy import layer_init
-
-from .data_types import HiddenState
 
 
 class _LSTMLayer(linen.Module):
@@ -23,58 +22,52 @@ class _LSTMLayer(linen.Module):
 
 
 class RecurrentActorCritic(linen.Module):
-
+    layer_width: int
+    n_layers: int
+    n_recurrent_layers: int
     single_action_shape: int
     activation: linen.activation
 
     @linen.compact
-    def __call__(self, x, hidden_states: typing.Tuple[HiddenState, HiddenState]):
+    def __call__(self, x, hidden_states: HiddenStates):
 
-        cs_0, value = _LSTMLayer()(hidden_states[0].critic, x)
-        cs_1, value = _LSTMLayer()(hidden_states[1].critic, value)
+        new_hidden_states = list()
 
-        as_0, mean = _LSTMLayer()(hidden_states[0].actor, x)
-        as_1, mean = _LSTMLayer()(hidden_states[1].actor, mean)
+        # TODO: Is there a cleaner way to do this? It's really a tree-scan
+        for i in range(self.n_recurrent_layers):
+            h, x = _LSTMLayer()(hidden_states[i], x)
+            new_hidden_states.append(h)
 
-        # value = x[:, -1]
-        # mean = x[:, -1]
-        #
-        # for _ in range(2):
-        #     value = linen.Dense(self.observation_width, **layer_init())(value)
-        #     value = self.activation(value)
-        #
-        #     mean = linen.Dense(self.observation_width, **layer_init())(mean)
-        #     mean = self.activation(mean)
+        new_hidden_states = tuple(new_hidden_states)
 
-        value = linen.Dense(1, **layer_init(scale=1.0))(value[:, -1])
-        mean = linen.Dense(self.single_action_shape, **layer_init(scale=0.01))(
-            mean[:, -1]
-        )
+        value = x.reshape(x.shape[0], -1)
+        mean = x.reshape(x.shape[0], -1)
+
+        for _ in range(self.n_layers):
+            value = linen.Dense(self.layer_width, **layer_init())(value)
+            value = self.activation(value)
+
+            mean = linen.Dense(self.layer_width, **layer_init())(mean)
+            mean = self.activation(mean)
+
+        value = linen.Dense(1, **layer_init(scale=1.0))(value)
+        mean = linen.Dense(self.single_action_shape, **layer_init(scale=0.01))(mean)
 
         log_std = self.param(
             "log_std", linen.initializers.zeros, (self.single_action_shape,)
         )
 
-        return (
-            mean,
-            log_std,
-            value,
-            (
-                HiddenState(actor=as_0, critic=cs_0),
-                HiddenState(actor=as_1, critic=cs_1),
-            ),
-        )
+        return mean, log_std, value, new_hidden_states
 
 
-def initialise_carry(batch_dims, hidden_size: int) -> HiddenState:
+def initialise_carry(
+    n_layers: int, batch_dims: typing.Tuple[int, ...], hidden_size: int
+) -> HiddenStates:
     k = jax.random.PRNGKey(0)
-    return (
-        HiddenState(
-            actor=linen.OptimizedLSTMCell.initialize_carry(k, batch_dims, hidden_size),
-            critic=linen.OptimizedLSTMCell.initialize_carry(k, batch_dims, hidden_size),
-        ),
-        HiddenState(
-            actor=linen.OptimizedLSTMCell.initialize_carry(k, batch_dims, hidden_size),
-            critic=linen.OptimizedLSTMCell.initialize_carry(k, batch_dims, hidden_size),
-        ),
+
+    return tuple(
+        [
+            linen.OptimizedLSTMCell.initialize_carry(k, batch_dims, hidden_size)
+            for _ in range(n_layers)
+        ]
     )

@@ -1,6 +1,9 @@
+import typing
 from collections import namedtuple
 
-HiddenState = namedtuple("HiddenState", ["actor", "critic"])
+import jax.numpy as jnp
+
+HiddenStates = typing.Tuple[typing.Tuple[jnp.array, jnp.array], ...]
 
 LSTMTrajectory = namedtuple(
     "Trajectory",
