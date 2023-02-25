@@ -46,6 +46,31 @@ Total rewards per train step with parameters
 
 ![MLP Policy Rewards](.github/images/pendulum_mlp_rewards.png)
 
+#### Recurrent (LSTM) Policy Network
+
+This was tested against the pendulum environment with the velocity
+component of the observation masked.
+
+Total rewards per train step with parameters
+(see [example/lstm_usage.ipynb](examples/lstm_usage.ipynb))
+
+- `n-train`: 2,500
+- `n-steps`: 2,048
+- `n-train-epochs`: 4
+- `mini-batch-size`: 256
+- `n-test-steps`: 2,000
+- `sequence-length:` 8
+- `gamma`: 0.95
+- `gae-lambda`: 0.95
+- `entropy-coefficient`: 0.0001
+- `adam-eps`: 1e-8
+- `clip-coefficient`: 0.2
+- `critic-coefficient`: 0.5
+- `max-grad-norm`: 0.75
+- `LR`: 2e-3 &rarr; 2e-5
+
+![LSTM Policy Rewards](.github/images/pendulum_lstm_rewards.png)
+
 ## TODO
 
 - Early stopping based on the KL-divergence is not implemented.
