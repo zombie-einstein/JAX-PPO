@@ -21,6 +21,31 @@ Dependencies can be installed with [poetry](https://python-poetry.org/) by runni
 poetry install
 ```
 
+## Results
+
+### [Pendulum-V1](https://github.com/RobertTLange/gymnax/blob/main/gymnax/environments/classic_control/pendulum.py)
+
+#### MLP Policy Network
+
+Total rewards per train step with parameters
+(see [example/gym_usage.ipynb](examples/gym_usage.ipynb))
+
+- `n-train`: 2,500
+- `n-steps`: 2,048
+- `n-train-epochs`: 2
+- `mini-batch-size`: 256
+- `n-test-steps`: 2,000
+- `gamma`: 0.95
+- `gae-lambda`: 0.9
+- `entropy-coefficient`: 0.0001
+- `adam-eps`: 1e-8
+- `clip-coefficient`: 0.2
+- `critic-coefficient`: 0.5
+- `max-grad-norm`: 0.75
+- `LR`: 2e-3 &rarr; 2e-5
+
+![MLP Policy Rewards](.github/images/pendulum_mlp_rewards.png)
+
 ## TODO
 
 - Early stopping based on the KL-divergence is not implemented.
