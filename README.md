@@ -1,4 +1,4 @@
-# JAX-PPO
+# JAX PPO
 
 JAX (using [flax](https://flax.readthedocs.io/en/latest/)) Implementation of
 Proximal Policy Optimisation (PPO) Algorithm, designed for continuous action spaces.
