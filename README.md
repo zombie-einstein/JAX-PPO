@@ -47,6 +47,8 @@ Total rewards per train step with parameters
 
 ![MLP Policy Rewards](.github/images/pendulum_mlp_rewards.png)
 
+Mean and std of total rewards during training, averaged over random seeds.
+
 #### Recurrent (LSTM) Policy Network
 
 This was tested against the pendulum environment with the velocity
@@ -55,27 +57,31 @@ component of the observation masked.
 Total rewards per train step with parameters
 (see [example/lstm_usage.ipynb](examples/lstm_usage.ipynb))
 
-- `n-train`: 2,000
-- `n-steps`: 8,192
+- `n-train`: 2,500
+- `n-train-env`: 32
+- `n-test-env`: 5
 - `n-train-epochs`: 2
 - `mini-batch-size`: 512
 - `n-test-steps`: 2,000
 - `sequence-length`: 8
-- `n-burn-in`:
+- `n-burn-in`: 8
 - `gamma`: 0.95
 - `gae-lambda`: 0.99
-- `entropy-coefficient`: 0.002
+- `entropy-coefficient`: 0.0001
 - `adam-eps`: 1e-8
 - `clip-coefficient`: 0.1
 - `critic-coefficient`: 0.5
 - `max-grad-norm`: 0.75
-- `LR`: 2e-3 &rarr; 2e-4
+- `LR`: 2e-3 &rarr; 2e-6
 
 > **_NOTE:_**  This achieves good results but seems to be somewhat unstable. I
 > suspect this might be due to stale hidden states
 > ([see here](https://kam.al/blog/ppo_stale_states/))
 
 ![LSTM Policy Rewards](.github/images/pendulum_lstm_rewards.png)
+
+Avg total rewards during training across test environments, generated from
+10 random seeds.
 
 ## Implementation Notes
 

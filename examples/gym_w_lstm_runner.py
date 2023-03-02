@@ -29,10 +29,8 @@ def _reset_env(
     key: jax.random.PRNGKey,
     env: environment.Environment,
     env_params: environment.EnvParams,
-    agent: jax_ppo.Agent,
     seq_len: int,
     n_recurrent_layers: int,
-    n_burn_in: int,
 ) -> typing.Tuple[chex.PRNGKey, chex.Array, environment.EnvState, jax_ppo.HiddenStates]:
     def warmup_step(carry, _):
         _observation, _state, k = carry
@@ -40,28 +38,6 @@ def _reset_env(
         _action = env.action_space(env_params).sample(k1)
         new_observation, new_state, _, _, _ = env.step(k2, _state, _action, env_params)
         return (new_observation, new_state, k), new_observation
-
-    def burn_in_step(_, carry):
-        k, _agent, _hidden_state, _state, _observation = carry
-
-        (
-            k,
-            _action,
-            _log_likelihood,
-            _value,
-            new_hidden_state,
-        ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
-
-        k, k_step = jax.random.split(k)
-        new_observation, new_state, _reward, _done, _ = env.step(
-            k_step, _state, _action, env_params
-        )
-
-        new_observation = jnp.hstack(
-            (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
-        )
-
-        return k, _agent, new_hidden_state, new_state, new_observation
 
     key, reset_key = jax.random.split(key)
     observation, state = env.reset(reset_key, env_params)
@@ -75,18 +51,10 @@ def _reset_env(
     obs_size = np.prod(env.observation_space(env_params).shape)
     hidden_states = jax_ppo.initialise_carry(n_recurrent_layers, (1,), obs_size)
 
-    key, agent, hidden_states, state, observations = jax.lax.fori_loop(
-        0,
-        n_burn_in,
-        burn_in_step,
-        (key, agent, hidden_states, state, observations),
-    )
-
     return key, observations, state, hidden_states
 
 
 def _generate_samples(
-    key: jax.random.PRNGKey,
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
@@ -95,7 +63,8 @@ def _generate_samples(
     n_recurrent_layers: int,
     n_burn_in: int,
     ppo_params: jax_ppo.PPOParams,
-) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.LSTMBatch]:
+    key: jax.random.PRNGKey,
+) -> jax_ppo.LSTMBatch:
     def _sample_step(carry, _):
         k, _agent, _hidden_state, _state, _observation = carry
 
@@ -115,14 +84,6 @@ def _generate_samples(
         new_observation = jnp.hstack(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
         )
-        k, new_observation, new_state, new_hidden_state = jax.lax.cond(
-            _done,
-            lambda _k: _reset_env(
-                _k, env, env_params, _agent, seq_len, n_recurrent_layers, n_burn_in
-            ),
-            lambda _k: (_k, new_observation, new_state, new_hidden_state),
-            k,
-        )
 
         return (
             (k, _agent, new_hidden_state, new_state, new_observation),
@@ -138,25 +99,22 @@ def _generate_samples(
         )
 
     key, observation, state, hidden_states = _reset_env(
-        key, env, env_params, agent, seq_len, n_recurrent_layers, n_burn_in
+        key, env, env_params, seq_len, n_recurrent_layers
     )
 
     _, trajectories = jax.lax.scan(
         _sample_step,
         (key, agent, hidden_states, state, observation),
         None,
-        length=n_samples + 1,
+        length=n_samples + 1 - seq_len,
     )
 
-    batch = jax_ppo.prepare_lstm_batch(ppo_params, trajectories)
-    # TODO: Need to remove batch axes here? Can this be pulled into batch processing?
-    batch = jax.tree_util.tree_map(lambda x: x[:, 0], batch)
+    batch = jax_ppo.prepare_lstm_batch(ppo_params, trajectories, n_burn_in)
 
-    return key, batch
+    return batch
 
 
 def test_policy(
-    key: jax.random.PRNGKey,
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
@@ -164,6 +122,7 @@ def test_policy(
     seq_len: int,
     n_recurrent_layers: int,
     n_burn_in: int,
+    key: jax.random.PRNGKey,
     greedy_policy: bool = False,
 ):
     def _step(carry, _):
@@ -191,40 +150,35 @@ def test_policy(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
         )
 
-        k, new_observation, new_state, new_hidden_state = jax.lax.cond(
-            _done,
-            lambda _k: _reset_env(
-                _k, env, env_params, _agent, seq_len, n_recurrent_layers, n_burn_in
-            ),
-            lambda _k: (_k, new_observation, new_state, new_hidden_state),
-            k,
-        )
-
         return (
             (k, _agent, new_hidden_state, new_state, new_observation),
             (_observation, _reward[0]),
         )
 
     key, observation, state, hidden_states = _reset_env(
-        key, env, env_params, agent, seq_len, n_recurrent_layers, n_burn_in
+        key, env, env_params, seq_len, n_recurrent_layers
     )
 
-    _, records = jax.lax.scan(
-        _step, (key, agent, hidden_states, state, observation), None, length=n_steps
+    _, (obs_ts, reward_ts) = jax.lax.scan(
+        _step,
+        (key, agent, hidden_states, state, observation),
+        None,
+        length=n_steps - seq_len,
     )
 
-    return key, records[0], records[1]
+    return obs_ts.at[n_burn_in:].get(), reward_ts.at[n_burn_in:].get()
 
 
 @partial(
     jax.jit,
     static_argnames=(
         "env",
+        "env_params",
         "n_train",
-        "n_samples",
+        "n_train_env",
         "n_train_epochs",
         "mini_batch_size",
-        "n_test_steps",
+        "n_test_env",
         "seq_len",
         "n_recurrent_layers",
         "n_burn_in",
@@ -237,10 +191,10 @@ def train(
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
     n_train: int,
-    n_samples: int,
+    n_train_env: int,
     n_train_epochs: int,
     mini_batch_size: int,
-    n_test_steps: int,
+    n_test_env: int,
     seq_len: int,
     n_recurrent_layers: int,
     n_burn_in: int,
@@ -253,20 +207,34 @@ def train(
     jnp.array,
     jnp.array,
 ]:
+
+    n_env_steps = env_params.max_steps_in_episode
+
     @jax_tqdm.scan_tqdm(n_train)
     def _train_step(carry, _):
         _key, _agent = carry
 
-        _key, batch = _generate_samples(
-            _key,
-            env,
-            env_params,
-            _agent,
-            n_samples,
-            seq_len,
-            n_recurrent_layers,
-            n_burn_in,
-            ppo_params,
+        _sample_keys = jax.random.split(_key, n_train_env + 1)
+        _key, _sample_keys = _sample_keys[0], _sample_keys[1:]
+
+        batches = jax.vmap(
+            partial(
+                _generate_samples,
+                env,
+                env_params,
+                _agent,
+                n_env_steps,
+                seq_len,
+                n_recurrent_layers,
+                n_burn_in,
+                ppo_params,
+            )
+        )(
+            _sample_keys,
+        )
+
+        batches = jax.tree_util.tree_map(
+            lambda x: jnp.reshape(x, (np.prod(x.shape[:3]),) + x.shape[3:]), batches
         )
 
         _key, _agent, _losses = jax_ppo.train_step(
@@ -275,26 +243,31 @@ def train(
             mini_batch_size,
             1_000,
             ppo_params,
-            batch,
+            batches,
             _agent,
         )
 
-        _key, _ts, _rewards = test_policy(
-            _key,
-            env,
-            env_params,
-            _agent,
-            n_test_steps,
-            seq_len,
-            n_recurrent_layers,
-            n_burn_in,
-            greedy_policy=greedy_test_policy,
-        )
+        _test_keys = jax.random.split(_key, n_test_env + 1)
+        _key, _test_keys = _test_keys[0], _test_keys[1:]
 
-        return (_key, _agent), (_losses, _ts, _rewards)
+        _obs_ts, _rewards = jax.vmap(
+            partial(
+                test_policy,
+                env,
+                env_params,
+                _agent,
+                n_env_steps,
+                seq_len,
+                n_recurrent_layers,
+                n_burn_in,
+                greedy_policy=greedy_test_policy,
+            )
+        )(_test_keys)
 
-    (key, agent), (losses, ts, rewards) = jax.lax.scan(
+        return (_key, _agent), (_losses, _obs_ts, _rewards)
+
+    (key, agent), (losses, obs_ts, rewards) = jax.lax.scan(
         _train_step, (key, agent), jnp.arange(n_train)
     )
 
-    return key, agent, losses, ts, rewards
+    return key, agent, losses, obs_ts, rewards
