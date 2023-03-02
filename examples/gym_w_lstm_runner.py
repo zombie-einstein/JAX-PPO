@@ -1,9 +1,11 @@
 import typing
 from functools import partial
 
+import chex
 import jax
 import jax.numpy as jnp
 import jax_tqdm
+import numpy as np
 from gymnax.environments import Pendulum, environment, spaces
 
 import jax_ppo
@@ -27,24 +29,60 @@ def _reset_env(
     key: jax.random.PRNGKey,
     env: environment.Environment,
     env_params: environment.EnvParams,
+    agent: jax_ppo.Agent,
     seq_len: int,
-):
-    def step(carry, _):
+    n_recurrent_layers: int,
+    n_burn_in: int,
+) -> typing.Tuple[chex.PRNGKey, chex.Array, environment.EnvState, jax_ppo.HiddenStates]:
+    def warmup_step(carry, _):
         _observation, _state, k = carry
         k, k1, k2 = jax.random.split(k, 3)
         _action = env.action_space(env_params).sample(k1)
-        # _action = jnp.zeros(action_shape)
         new_observation, new_state, _, _, _ = env.step(k2, _state, _action, env_params)
         return (new_observation, new_state, k), new_observation
+
+    def burn_in_step(_, carry):
+        k, _agent, _hidden_state, _state, _observation = carry
+
+        (
+            k,
+            _action,
+            _log_likelihood,
+            _value,
+            new_hidden_state,
+        ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
+
+        k, k_step = jax.random.split(k)
+        new_observation, new_state, _reward, _done, _ = env.step(
+            k_step, _state, _action, env_params
+        )
+
+        new_observation = jnp.hstack(
+            (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
+        )
+
+        return k, _agent, new_hidden_state, new_state, new_observation
 
     key, reset_key = jax.random.split(key)
     observation, state = env.reset(reset_key, env_params)
 
     (observation, state, key), observations = jax.lax.scan(
-        step, (observation, state, key), None, length=seq_len
+        warmup_step, (observation, state, key), None, length=seq_len
     )
 
-    return key, observations[jnp.newaxis], state
+    observations = observations[jnp.newaxis]
+
+    obs_size = np.prod(env.observation_space(env_params).shape)
+    hidden_states = jax_ppo.initialise_carry(n_recurrent_layers, (1,), obs_size)
+
+    key, agent, hidden_states, state, observations = jax.lax.fori_loop(
+        0,
+        n_burn_in,
+        burn_in_step,
+        (key, agent, hidden_states, state, observations),
+    )
+
+    return key, observations, state, hidden_states
 
 
 def _generate_samples(
@@ -52,11 +90,12 @@ def _generate_samples(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
-    hidden_state: jax_ppo.HiddenStates,
     n_samples: int,
     seq_len: int,
+    n_recurrent_layers: int,
+    n_burn_in: int,
     ppo_params: jax_ppo.PPOParams,
-) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.HiddenStates, jax_ppo.LSTMBatch]:
+) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.LSTMBatch]:
     def _sample_step(carry, _):
         k, _agent, _hidden_state, _state, _observation = carry
 
@@ -76,10 +115,12 @@ def _generate_samples(
         new_observation = jnp.hstack(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
         )
-        k, new_observation, new_state = jax.lax.cond(
+        k, new_observation, new_state, new_hidden_state = jax.lax.cond(
             _done,
-            lambda _k: _reset_env(_k, env, env_params, seq_len),
-            lambda _k: (_k, new_observation, new_state),
+            lambda _k: _reset_env(
+                _k, env, env_params, _agent, seq_len, n_recurrent_layers, n_burn_in
+            ),
+            lambda _k: (_k, new_observation, new_state, new_hidden_state),
             k,
         )
 
@@ -96,11 +137,13 @@ def _generate_samples(
             ),
         )
 
-    key, observation, state = _reset_env(key, env, env_params, seq_len)
+    key, observation, state, hidden_states = _reset_env(
+        key, env, env_params, agent, seq_len, n_recurrent_layers, n_burn_in
+    )
 
-    (key, agent, hidden_state, state, observation), trajectories = jax.lax.scan(
+    _, trajectories = jax.lax.scan(
         _sample_step,
-        (key, agent, hidden_state, state, observation),
+        (key, agent, hidden_states, state, observation),
         None,
         length=n_samples + 1,
     )
@@ -109,7 +152,7 @@ def _generate_samples(
     # TODO: Need to remove batch axes here? Can this be pulled into batch processing?
     batch = jax.tree_util.tree_map(lambda x: x[:, 0], batch)
 
-    return key, hidden_state, batch
+    return key, batch
 
 
 def test_policy(
@@ -117,9 +160,10 @@ def test_policy(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
-    hidden_state: jax_ppo.HiddenStates,
     n_steps: int,
     seq_len: int,
+    n_recurrent_layers: int,
+    n_burn_in: int,
     greedy_policy: bool = False,
 ):
     def _step(carry, _):
@@ -147,10 +191,12 @@ def test_policy(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis, jnp.newaxis])
         )
 
-        k, new_observation, new_state = jax.lax.cond(
+        k, new_observation, new_state, new_hidden_state = jax.lax.cond(
             _done,
-            lambda _k: _reset_env(_k, env, env_params, seq_len),
-            lambda _k: (_k, new_observation, new_state),
+            lambda _k: _reset_env(
+                _k, env, env_params, _agent, seq_len, n_recurrent_layers, n_burn_in
+            ),
+            lambda _k: (_k, new_observation, new_state, new_hidden_state),
             k,
         )
 
@@ -159,14 +205,12 @@ def test_policy(
             (_observation, _reward[0]),
         )
 
-    (
-        key,
-        observation,
-        state,
-    ) = _reset_env(key, env, env_params, seq_len)
+    key, observation, state, hidden_states = _reset_env(
+        key, env, env_params, agent, seq_len, n_recurrent_layers, n_burn_in
+    )
 
-    (key, agent, hidden_state, state, observation), records = jax.lax.scan(
-        _step, (key, agent, hidden_state, state, observation), None, length=n_steps
+    _, records = jax.lax.scan(
+        _step, (key, agent, hidden_states, state, observation), None, length=n_steps
     )
 
     return key, records[0], records[1]
@@ -182,6 +226,8 @@ def test_policy(
         "mini_batch_size",
         "n_test_steps",
         "seq_len",
+        "n_recurrent_layers",
+        "n_burn_in",
         "greedy_test_policy",
     ),
 )
@@ -190,29 +236,37 @@ def train(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: jax_ppo.Agent,
-    hidden_state: jax_ppo.HiddenStates,
     n_train: int,
     n_samples: int,
     n_train_epochs: int,
     mini_batch_size: int,
     n_test_steps: int,
     seq_len: int,
+    n_recurrent_layers: int,
+    n_burn_in: int,
     ppo_params: jax_ppo.PPOParams,
     greedy_test_policy: bool = False,
 ) -> typing.Tuple[
     jax.random.PRNGKey,
     jax_ppo.Agent,
-    jax_ppo.HiddenStates,
     typing.Dict,
     jnp.array,
     jnp.array,
 ]:
     @jax_tqdm.scan_tqdm(n_train)
     def _train_step(carry, _):
-        _key, _agent, _hidden_state = carry
+        _key, _agent = carry
 
-        _key, _hidden_state, batch = _generate_samples(
-            _key, env, env_params, _agent, _hidden_state, n_samples, seq_len, ppo_params
+        _key, batch = _generate_samples(
+            _key,
+            env,
+            env_params,
+            _agent,
+            n_samples,
+            seq_len,
+            n_recurrent_layers,
+            n_burn_in,
+            ppo_params,
         )
 
         _key, _agent, _losses = jax_ppo.train_step(
@@ -230,16 +284,17 @@ def train(
             env,
             env_params,
             _agent,
-            _hidden_state,
             n_test_steps,
             seq_len,
+            n_recurrent_layers,
+            n_burn_in,
             greedy_policy=greedy_test_policy,
         )
 
-        return (_key, _agent, _hidden_state), (_losses, _ts, _rewards)
+        return (_key, _agent), (_losses, _ts, _rewards)
 
-    (key, agent, hidden_state), (losses, ts, rewards) = jax.lax.scan(
-        _train_step, (key, agent, hidden_state), jnp.arange(n_train)
+    (key, agent), (losses, ts, rewards) = jax.lax.scan(
+        _train_step, (key, agent), jnp.arange(n_train)
     )
 
-    return key, agent, hidden_state, losses, ts, rewards
+    return key, agent, losses, ts, rewards

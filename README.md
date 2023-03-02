@@ -9,6 +9,7 @@ and the recurrent implementation using LSTM motivated by these blogs:
 
 - https://npitsillos.github.io/blog/2021/recurrent-ppo/
 - https://medium.com/@ngoodger_7766/proximal-policy-optimisation-in-pytorch-with-recurrent-models-edefb8a72180
+- https://kam.al/blog/ppo_stale_states/
 
 ## Usage
 
@@ -54,29 +55,48 @@ component of the observation masked.
 Total rewards per train step with parameters
 (see [example/lstm_usage.ipynb](examples/lstm_usage.ipynb))
 
-- `n-train`: 2,500
-- `n-steps`: 2,048
-- `n-train-epochs`: 4
-- `mini-batch-size`: 256
+- `n-train`: 2,000
+- `n-steps`: 8,192
+- `n-train-epochs`: 2
+- `mini-batch-size`: 512
 - `n-test-steps`: 2,000
-- `sequence-length:` 8
+- `sequence-length`: 8
+- `n-burn-in`:
 - `gamma`: 0.95
-- `gae-lambda`: 0.95
-- `entropy-coefficient`: 0.0001
+- `gae-lambda`: 0.99
+- `entropy-coefficient`: 0.002
 - `adam-eps`: 1e-8
-- `clip-coefficient`: 0.2
+- `clip-coefficient`: 0.1
 - `critic-coefficient`: 0.5
 - `max-grad-norm`: 0.75
-- `LR`: 2e-3 &rarr; 2e-5
+- `LR`: 2e-3 &rarr; 2e-4
+
+> **_NOTE:_**  This achieves good results but seems to be somewhat unstable. I
+> suspect this might be due to stale hidden states
+> ([see here](https://kam.al/blog/ppo_stale_states/))
 
 ![LSTM Policy Rewards](.github/images/pendulum_lstm_rewards.png)
+
+## Implementation Notes
+
+### Recurrent Hidden States Initialisation
+
+At the start of each episode we reset the LSTM hidden-states to zero, but then
+*burn-in* their value before we collect trajectories (and the same during evaluation).
+I did also try carrying over hidden states between training steps, with good results,
+but if training across multiple environments this becomes a bit harder to reason about.
+
+Note that this may lead to strange behaviour is the training environment quickly
+reaches a terminal state (i.e. if the episode completes during the burn-in period).
 
 ## TODO
 
 - Early stopping based on the KL-divergence is not implemented.
 - Benchmark against other reference implementations.
+- Recalculate advantages during policy update.
+- Recalculate hidden states during policy update.
 
-## Developers
+## Developer Notes
 
 ### Pre-Commit Hooks
 
