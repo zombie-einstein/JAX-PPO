@@ -3,11 +3,12 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from jax_ppo.data_types import Agent, PPOParams
 from jax_ppo.loss import calculate_losses
-from jax_ppo.lstm.data_types import LSTMBatch
-from jax_ppo.mlp.data_types import Batch
+from jax_ppo.lstm.data_types import LSTMBatch, LSTMTrajectory
+from jax_ppo.mlp.data_types import Batch, Trajectory
 
 
 @partial(jax.jit, static_argnames="batch_size")
@@ -79,6 +80,85 @@ def train_step(
         _key, _sub_key = jax.random.split(_key)
         _idxs = jax.random.choice(_sub_key, batch_size, (n_samples,), replace=False)
         _batch = jax.tree_util.tree_map(lambda y: y.at[_idxs].get(), batch)
+
+        _agent, _losses = policy_update(
+            agent=_agent,
+            ppo_params=ppo_params,
+            batch=_batch,
+            batch_size=mini_batch_size,
+        )
+
+        return (_key, _agent), _losses
+
+    (key, agent), losses = jax.lax.scan(
+        _inner_update, (key, agent), None, length=update_epochs
+    )
+
+    losses = jax.tree_util.tree_map(jnp.ravel, losses)
+
+    return key, agent, losses
+
+
+@partial(
+    jax.jit,
+    static_argnames=(
+        "prepare_batch_func",
+        "update_epochs",
+        "mini_batch_size",
+        "max_mini_batches",
+    ),
+)
+def train_step_with_refresh(
+    prepare_batch_func,
+    key: jax.random.PRNGKey,
+    update_epochs: int,
+    mini_batch_size: int,
+    max_mini_batches: int,
+    ppo_params: PPOParams,
+    trajectories: typing.Union[LSTMTrajectory, Trajectory],
+    agent: Agent,
+    n_burn_in: int = 0,
+) -> typing.Tuple[jax.random.PRNGKey, Agent, typing.Dict]:
+    """
+    Update policy based on a batch of trajectories
+
+    Args:
+        prepare_batch_func: Batch processing function
+        key: JAX random key
+        update_epochs: Number of training epochs run for this batch
+        mini_batch_size: Size of mini batch samples for this batch
+        max_mini_batches: Maximum number of mini-batches, used to clip the
+            number of mini-batches during training where the batch size is
+            very large,
+        ppo_params: PPO training parameters
+        trajectories: Batch of trajectories
+        agent: PPO agent training state and policy
+        n_burn_in: Number of burn-in step used by recurrent policy
+
+    Returns:
+        - Updated JAX random key
+        - Updated PPO agent
+        - Dictionary of training metrics gathered over training process
+    """
+
+    def _inner_update(carry, _):
+        _key, _agent = carry
+
+        _key, _sub_key = jax.random.split(_key)
+
+        batches = jax.vmap(prepare_batch_func, in_axes=(None, 0, None))(
+            ppo_params, trajectories, n_burn_in
+        )
+        batches = jax.tree_util.tree_map(
+            lambda x: jnp.reshape(x, (np.prod(x.shape[:3]),) + x.shape[3:]), batches
+        )
+
+        batch_size = batches.state.shape[0]
+        n_samples = batch_size - (batch_size % mini_batch_size)
+        n_samples = min(n_samples, max_mini_batches * mini_batch_size)
+
+        _idxs = jax.random.choice(_sub_key, batch_size, (n_samples,), replace=False)
+        _batch = jax.tree_util.tree_map(lambda y: y.at[_idxs].get(), batches)
 
         _agent, _losses = policy_update(
             agent=_agent,
