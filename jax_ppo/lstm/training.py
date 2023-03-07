@@ -7,8 +7,10 @@ import jax.numpy as jnp
 import numpy as np
 from gymnax.environments import environment
 
-import jax_ppo
-from jax_ppo import runner
+from jax_ppo import data_types, runner
+from jax_ppo.lstm import algos
+from jax_ppo.lstm import data_types as recc_data_types
+from jax_ppo.lstm import policy
 
 
 def _reset_env(
@@ -18,7 +20,9 @@ def _reset_env(
     seq_len: int,
     n_recurrent_layers: int,
     n_agents: typing.Optional[int],
-) -> typing.Tuple[chex.PRNGKey, chex.Array, environment.EnvState, jax_ppo.HiddenStates]:
+) -> typing.Tuple[
+    chex.PRNGKey, chex.Array, environment.EnvState, recc_data_types.HiddenStates
+]:
     def warmup_step(carry, _):
         _observation, _state, k = carry
         k, k1, k2 = jax.random.split(k, 3)
@@ -40,9 +44,7 @@ def _reset_env(
         batch_size = n_agents
 
     obs_size = np.prod(env.observation_space(env_params).shape)
-    hidden_states = jax_ppo.initialise_carry(
-        n_recurrent_layers, (batch_size,), obs_size
-    )
+    hidden_states = policy.initialise_carry(n_recurrent_layers, (batch_size,), obs_size)
 
     return key, observations, state, hidden_states
 
@@ -50,12 +52,12 @@ def _reset_env(
 def _generate_samples(
     env: environment.Environment,
     env_params: environment.EnvParams,
-    agent: jax_ppo.Agent,
+    agent: data_types.Agent,
     n_samples: int,
     n_agents: typing.Optional[int],
     key: jax.random.PRNGKey,
     **static_kwargs,
-) -> jax_ppo.LSTMBatch:
+) -> recc_data_types.LSTMBatch:
     def _sample_step(carry, _):
         k, _agent, _hidden_state, _state, _observation = carry
 
@@ -65,7 +67,7 @@ def _generate_samples(
             _log_likelihood,
             _value,
             new_hidden_state,
-        ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
+        ) = algos.sample_actions(k, _agent, _observation, _hidden_state)
 
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
@@ -81,7 +83,7 @@ def _generate_samples(
 
         return (
             (k, _agent, new_hidden_state, new_state, new_observation),
-            jax_ppo.LSTMTrajectory(
+            recc_data_types.LSTMTrajectory(
                 state=_observation,
                 action=_action,
                 log_likelihood=_log_likelihood,
@@ -114,7 +116,7 @@ def _generate_samples(
 def test_policy(
     env: environment.Environment,
     env_params: environment.EnvParams,
-    agent: jax_ppo.Agent,
+    agent: data_types.Agent,
     n_steps: int,
     n_agents: int,
     key: jax.random.PRNGKey,
@@ -125,7 +127,7 @@ def test_policy(
         k, _agent, _hidden_state, _state, _observation = carry
 
         if greedy_policy:
-            _action, new_hidden_state = jax_ppo.max_lstm_action(
+            _action, new_hidden_state = algos.max_action(
                 _agent, _observation, _hidden_state
             )
         else:
@@ -135,7 +137,7 @@ def test_policy(
                 _log_likelihood,
                 _value,
                 new_hidden_state,
-            ) = jax_ppo.sample_lstm_actions(k, _agent, _observation, _hidden_state)
+            ) = algos.sample_actions(k, _agent, _observation, _hidden_state)
 
         k, k_step = jax.random.split(k)
         new_observation, new_state, _reward, _done, _ = env.step(
@@ -195,7 +197,7 @@ def train(
     key: jax.random.PRNGKey,
     env: environment.Environment,
     env_params: environment.EnvParams,
-    agent: jax_ppo.Agent,
+    agent: data_types.Agent,
     n_train: int,
     n_train_env: int,
     n_train_epochs: int,
@@ -204,13 +206,13 @@ def train(
     seq_len: int,
     n_recurrent_layers: int,
     n_burn_in: int,
-    ppo_params: jax_ppo.PPOParams,
+    ppo_params: data_types.PPOParams,
     n_agents: typing.Optional[int] = None,
     n_env_steps: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
 ) -> typing.Tuple[
     jax.random.PRNGKey,
-    jax_ppo.Agent,
+    data_types.Agent,
     typing.Dict,
     jnp.array,
     jnp.array,
@@ -218,7 +220,7 @@ def train(
 
     return runner.train(
         _generate_samples,
-        jax_ppo.prepare_lstm_batch,
+        algos.prepare_batch,
         test_policy,
         key,
         env,

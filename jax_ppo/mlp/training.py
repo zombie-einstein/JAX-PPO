@@ -5,18 +5,19 @@ import jax
 import jax.numpy as jnp
 from gymnax.environments import environment
 
-import jax_ppo
-from jax_ppo import runner
+from jax_ppo import data_types, runner
+from jax_ppo.mlp import algos
+from jax_ppo.mlp import data_types as mlp_data_type
 
 
 def _generate_samples(
     env: environment.Environment,
     env_params: environment.EnvParams,
-    agent: jax_ppo.Agent,
+    agent: data_types.Agent,
     n_samples: int,
     n_agents: typing.Optional[int],
     key: jax.random.PRNGKey,
-) -> jax_ppo.Trajectory:
+) -> mlp_data_type.Trajectory:
     """
     Generate batch of trajectories from an agent an environment.
 
@@ -35,7 +36,7 @@ def _generate_samples(
 
     def _sample_step(carry, _):
         k, _agent, _state, _observation = carry
-        k, _action, _log_likelihood, _value = jax_ppo.sample_actions(
+        k, _action, _log_likelihood, _value = algos.sample_actions(
             k, _agent, _observation
         )
         k, k_step = jax.random.split(k)
@@ -49,7 +50,7 @@ def _generate_samples(
 
         return (
             (k, _agent, new_state, new_observation),
-            jax_ppo.Trajectory(
+            mlp_data_type.Trajectory(
                 state=_observation,
                 action=_action,
                 log_likelihood=_log_likelihood,
@@ -75,7 +76,7 @@ def _generate_samples(
 def test_policy(
     env: environment.Environment,
     env_params: environment.EnvParams,
-    agent: jax_ppo.Agent,
+    agent: data_types.Agent,
     n_steps: int,
     n_agents: typing.Optional[int],
     key: jax.random.PRNGKey,
@@ -103,9 +104,9 @@ def test_policy(
         k, _agent, _state, _observation = carry
 
         if greedy_policy:
-            _action = jax_ppo.max_action(_agent, _observation)
+            _action = algos.max_action(_agent, _observation)
         else:
-            k, _action, _log_likelihood, _value = jax_ppo.sample_actions(
+            k, _action, _log_likelihood, _value = algos.sample_actions(
                 k, _agent, _observation
             )
         k, k_step = jax.random.split(k)
@@ -158,17 +159,19 @@ def train(
     key: jax.random.PRNGKey,
     env: environment.Environment,
     env_params: environment.EnvParams,
-    agent: jax_ppo.Agent,
+    agent: data_types.Agent,
     n_train: int,
     n_train_env: int,
     n_train_epochs: int,
     mini_batch_size: int,
     n_test_env: int,
-    ppo_params: jax_ppo.PPOParams,
+    ppo_params: data_types.PPOParams,
     n_agents: typing.Optional[int] = None,
     n_env_steps: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
-) -> typing.Tuple[jax.random.PRNGKey, jax_ppo.Agent, typing.Dict, jnp.array, jnp.array]:
+) -> typing.Tuple[
+    jax.random.PRNGKey, data_types.Agent, typing.Dict, jnp.array, jnp.array
+]:
     """
     Train PPO agent in a Gymnax environment.
 
@@ -199,7 +202,7 @@ def train(
 
     return runner.train(
         _generate_samples,
-        jax_ppo.prepare_batch,
+        algos.prepare_batch,
         test_policy,
         key,
         env,
