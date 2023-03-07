@@ -39,9 +39,9 @@ def max_action(agent: Agent, state, hidden_states: HiddenStates):
 
 
 def prepare_batch(
-    ppo_params: PPOParams, trajectories: LSTMTrajectory, burn_in: int
+    ppo_params: PPOParams, trajectories: LSTMTrajectory, **static_kwargs
 ) -> LSTMBatch:
-
+    burn_in = static_kwargs["burn_in"]
     trajectories = jax.tree_util.tree_map(lambda x: x.at[burn_in:].get(), trajectories)
 
     adv, returns = calculate_gae(ppo_params, trajectories)

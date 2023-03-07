@@ -28,9 +28,7 @@ def max_action(agent: Agent, state):
     return mean
 
 
-def prepare_batch(
-    ppo_params: PPOParams, trajectories: Trajectory, n_burn_in: int
-) -> Batch:
+def prepare_batch(ppo_params: PPOParams, trajectories: Trajectory) -> Batch:
     adv, returns = calculate_gae(ppo_params, trajectories)
     return Batch(
         state=trajectories.state.at[:-1].get(),

@@ -99,15 +99,6 @@ def train_step(
     return key, agent, losses
 
 
-@partial(
-    jax.jit,
-    static_argnames=(
-        "prepare_batch_func",
-        "update_epochs",
-        "mini_batch_size",
-        "max_mini_batches",
-    ),
-)
 def train_step_with_refresh(
     prepare_batch_func,
     key: jax.random.PRNGKey,
@@ -117,7 +108,7 @@ def train_step_with_refresh(
     ppo_params: PPOParams,
     trajectories: typing.Union[LSTMTrajectory, Trajectory],
     agent: Agent,
-    n_burn_in: int = 0,
+    **static_kwargs,
 ) -> typing.Tuple[jax.random.PRNGKey, Agent, typing.Dict]:
     """
     Update policy based on a batch of trajectories
@@ -133,7 +124,6 @@ def train_step_with_refresh(
         ppo_params: PPO training parameters
         trajectories: Batch of trajectories
         agent: PPO agent training state and policy
-        n_burn_in: Number of burn-in step used by recurrent policy
 
     Returns:
         - Updated JAX random key
@@ -146,9 +136,9 @@ def train_step_with_refresh(
 
         _key, _sub_key = jax.random.split(_key)
 
-        batches = jax.vmap(prepare_batch_func, in_axes=(None, 0, None))(
-            ppo_params, trajectories, n_burn_in
-        )
+        prepare_batch = partial(prepare_batch_func, **static_kwargs)
+
+        batches = jax.vmap(prepare_batch, in_axes=(None, 0))(ppo_params, trajectories)
         batches = jax.tree_util.tree_map(
             lambda x: jnp.reshape(x, (np.prod(x.shape[:3]),) + x.shape[3:]), batches
         )

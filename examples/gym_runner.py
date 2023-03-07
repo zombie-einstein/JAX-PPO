@@ -3,11 +3,10 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import jax_tqdm
 from gymnax.environments import environment
 
 import jax_ppo
-from jax_ppo import training
+from jax_ppo import runner
 
 
 def _generate_samples(
@@ -70,7 +69,6 @@ def _generate_samples(
         _sample_step, (key, agent, state, observation), None, length=n_samples + 1
     )
 
-    # batch = jax_ppo.prepare_batch(ppo_params, trajectories)
     return trajectories
 
 
@@ -199,59 +197,22 @@ def train(
         - Reward time-series generate during testing
     """
 
-    if n_env_steps is None:
-        n_env_steps = env_params.max_steps_in_episode
-
-    @jax_tqdm.scan_tqdm(n_train, print_rate=1)
-    def _train_step(carry, _):
-        _key, _agent = carry
-
-        _sample_keys = jax.random.split(_key, n_train_env + 1)
-        _key, _sample_keys = _sample_keys[0], _sample_keys[1:]
-
-        trajectories = jax.vmap(
-            partial(
-                _generate_samples,
-                env,
-                env_params,
-                _agent,
-                n_env_steps,
-                n_agents,
-            )
-        )(
-            _sample_keys,
-        )
-
-        _key, _agent, _losses = training.train_step_with_refresh(
-            jax_ppo.prepare_batch,
-            _key,
-            n_train_epochs,
-            mini_batch_size,
-            1_000,
-            ppo_params,
-            trajectories,
-            _agent,
-        )
-
-        _test_keys = jax.random.split(_key, n_test_env + 1)
-        _key, _test_keys = _test_keys[0], _test_keys[1:]
-
-        _obs_ts, _rewards_ts = jax.vmap(
-            partial(
-                test_policy,
-                env,
-                env_params,
-                _agent,
-                n_env_steps,
-                n_agents,
-                greedy_policy=greedy_test_policy,
-            )
-        )(_test_keys)
-
-        return (_key, _agent), (_losses, _obs_ts, _rewards_ts)
-
-    (key, agent), (losses, ts, rewards) = jax.lax.scan(
-        _train_step, (key, agent), jnp.arange(n_train)
+    return runner.train(
+        _generate_samples,
+        jax_ppo.prepare_batch,
+        test_policy,
+        key,
+        env,
+        env_params,
+        agent,
+        n_train,
+        n_train_env,
+        n_train_epochs,
+        mini_batch_size,
+        n_test_env,
+        ppo_params,
+        n_agents,
+        greedy_test_policy,
+        10_000,
+        n_env_steps,
     )
-
-    return key, agent, losses, ts, rewards
