@@ -181,6 +181,7 @@ def test_policy(
         "n_recurrent_layers",
         "n_burn_in",
         "n_agents",
+        "n_env_steps",
         "greedy_test_policy",
     ),
 )
@@ -199,6 +200,7 @@ def train(
     n_burn_in: int,
     ppo_params: jax_ppo.PPOParams,
     n_agents: typing.Optional[int] = None,
+    n_env_steps: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
 ) -> typing.Tuple[
     jax.random.PRNGKey,
@@ -208,9 +210,10 @@ def train(
     jnp.array,
 ]:
 
-    n_env_steps = env_params.max_steps_in_episode
+    if n_env_steps is None:
+        n_env_steps = env_params.max_steps_in_episode
 
-    @jax_tqdm.scan_tqdm(n_train)
+    @jax_tqdm.scan_tqdm(n_train, print_rate=1)
     def _train_step(carry, _):
         _key, _agent = carry
 

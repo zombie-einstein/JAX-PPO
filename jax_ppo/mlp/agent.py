@@ -16,6 +16,7 @@ def init_agent(
     action_space_shape: typing.Tuple[int, ...],
     observation_space_shape: typing.Tuple[int, ...],
     schedule: typing.Union[float, optax._src.base.Schedule],
+    n_agents: int = 1,
     layer_width: int = 64,
     n_layers: int = 2,
     activation: flax.linen.activation = flax.linen.tanh,
@@ -35,7 +36,7 @@ def init_agent(
         ),
     )
 
-    fake_args_model = jnp.zeros(observation_space_shape)
+    fake_args_model = jnp.zeros((n_agents,) + observation_space_shape)
 
     key, sub_key = jax.random.split(key)
     params_model = policy.init(sub_key, fake_args_model)

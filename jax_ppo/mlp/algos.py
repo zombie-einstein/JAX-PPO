@@ -20,7 +20,7 @@ def sample_actions(key: jax.random.PRNGKey, agent: Agent, state):
     key, sub_key = jax.random.split(key)
     dist = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
     actions, log_likelihood = dist.sample_and_log_prob(seed=sub_key)
-    return key, actions, log_likelihood, jnp.squeeze(value)
+    return key, actions, log_likelihood, value[:, 0]
 
 
 def max_action(agent: Agent, state):
@@ -28,7 +28,9 @@ def max_action(agent: Agent, state):
     return mean
 
 
-def prepare_batch(ppo_params: PPOParams, trajectories: Trajectory) -> Batch:
+def prepare_batch(
+    ppo_params: PPOParams, trajectories: Trajectory, n_burn_in: int
+) -> Batch:
     adv, returns = calculate_gae(ppo_params, trajectories)
     return Batch(
         state=trajectories.state.at[:-1].get(),
