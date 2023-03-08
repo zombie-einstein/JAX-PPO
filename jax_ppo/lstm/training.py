@@ -27,7 +27,9 @@ def _reset_env(
         _observation, _state, k = carry
         k, k1, k2 = jax.random.split(k, 3)
         _action = env.action_space(env_params).sample(k1)
-        new_observation, new_state, _, _, _ = env.step(k2, _state, _action, env_params)
+        new_observation, new_state, _, _, _ = env.step_env(
+            k2, _state, _action, env_params
+        )
         return (new_observation, new_state, k), new_observation
 
     key, reset_key = jax.random.split(key)
@@ -49,7 +51,7 @@ def _reset_env(
     return key, observations, state, hidden_states
 
 
-def _generate_samples(
+def generate_samples(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: data_types.Agent,
@@ -70,12 +72,13 @@ def _generate_samples(
         ) = algos.sample_actions(k, _agent, _observation, _hidden_state)
 
         k, k_step = jax.random.split(k)
-        new_observation, new_state, _reward, _done, _ = env.step(
+        new_observation, new_state, _reward, _done, _ = env.step_env(
             k_step, _state, _action, env_params
         )
 
         if n_agents is None:
             new_observation = new_observation[jnp.newaxis]
+            _done = jnp.array([_done])
 
         new_observation = jnp.hstack(
             (_observation.at[:, 1:].get(), new_observation[jnp.newaxis])
@@ -89,7 +92,7 @@ def _generate_samples(
                 log_likelihood=_log_likelihood,
                 value=_value,
                 reward=_reward[0],
-                done=_done[jnp.newaxis],
+                done=_done,
                 hidden_states=_hidden_state,
             ),
         )
@@ -140,7 +143,7 @@ def test_policy(
             ) = algos.sample_actions(k, _agent, _observation, _hidden_state)
 
         k, k_step = jax.random.split(k)
-        new_observation, new_state, _reward, _done, _ = env.step(
+        new_observation, new_state, _reward, _done, _ = env.step_env(
             k_step, _state, _action, env_params
         )
 
@@ -219,7 +222,7 @@ def train(
 ]:
 
     return runner.train(
-        _generate_samples,
+        generate_samples,
         algos.prepare_batch,
         test_policy,
         key,

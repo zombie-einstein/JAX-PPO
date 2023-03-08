@@ -10,7 +10,7 @@ from jax_ppo.mlp import algos
 from jax_ppo.mlp import data_types as mlp_data_type
 
 
-def _generate_samples(
+def generate_samples(
     env: environment.Environment,
     env_params: environment.EnvParams,
     agent: data_types.Agent,
@@ -40,13 +40,13 @@ def _generate_samples(
             k, _agent, _observation
         )
         k, k_step = jax.random.split(k)
-        new_observation, new_state, _reward, _done, _ = env.step(
+        new_observation, new_state, _reward, _done, _ = env.step_env(
             k_step, _state, _action, env_params
         )
 
         if n_agents is None:
             new_observation = new_observation[jnp.newaxis]
-            _done = _done[jnp.newaxis]
+            _done = jnp.array([_done])
 
         return (
             (k, _agent, new_state, new_observation),
@@ -110,21 +110,15 @@ def test_policy(
                 k, _agent, _observation
             )
         k, k_step = jax.random.split(k)
-        new_observation, new_state, _reward, _done, _ = env.step(
+        new_observation, new_state, _reward, _done, _ = env.step_env(
             k_step, _state, _action, env_params
         )
-        new_observation, new_state = jax.lax.cond(
-            _done,
-            lambda: env.reset(k, env_params),
-            lambda: (new_observation, new_state),
-        )
-
         if n_agents is None:
             new_observation = new_observation[jnp.newaxis]
 
         return (
             (k, _agent, new_state, new_observation),
-            (_observation, _reward),
+            (_observation, _reward[0]),
         )
 
     key, reset_key = jax.random.split(key)
@@ -201,7 +195,7 @@ def train(
     """
 
     return runner.train(
-        _generate_samples,
+        generate_samples,
         algos.prepare_batch,
         test_policy,
         key,
