@@ -1,3 +1,5 @@
+import jax
+
 import jax_ppo
 from jax_ppo.lstm import training
 
@@ -57,7 +59,7 @@ def test_marl_policy_sampling(key, recurrent_agent, dummy_marl_env):
 def test_policy_testing(key, recurrent_agent, dummy_env):
     agent, _ = recurrent_agent
     burn_in = 3
-    obs_ts, reward_ts = training.test_policy(
+    state_ts, reward_ts = training.test_policy(
         env=dummy_env,
         env_params=dummy_env.default_params,
         agent=agent,
@@ -69,14 +71,18 @@ def test_policy_testing(key, recurrent_agent, dummy_env):
         burn_in=burn_in,
     )
     n = N_SAMPLES - SEQ_LEN - burn_in
-    assert obs_ts.shape == (n, 1, SEQ_LEN, N_OBS)
+
+    def test_shape(x):
+        assert x.shape[0] == n
+
+    jax.tree_util.tree_map(test_shape, state_ts)
     assert reward_ts.shape == (n, 1)
 
 
 def test_marl_policy_testing(key, recurrent_agent, dummy_marl_env):
     agent, _ = recurrent_agent
     burn_in = 3
-    obs_ts, reward_ts = training.test_policy(
+    state_ts, reward_ts = training.test_policy(
         env=dummy_marl_env,
         env_params=dummy_marl_env.default_params,
         agent=agent,
@@ -88,5 +94,9 @@ def test_marl_policy_testing(key, recurrent_agent, dummy_marl_env):
         burn_in=burn_in,
     )
     n = N_SAMPLES - SEQ_LEN - burn_in
-    assert obs_ts.shape == (n, N_AGENTS, SEQ_LEN, N_OBS)
+
+    def test_shape(x):
+        assert x.shape[0] == n
+
+    jax.tree_util.tree_map(test_shape, state_ts)
     assert reward_ts.shape == (n, N_AGENTS)

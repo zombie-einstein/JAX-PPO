@@ -130,7 +130,7 @@ def test_policy(
     key: jax.random.PRNGKey,
     greedy_policy: bool = False,
     **static_kwargs,
-):
+) -> typing.Tuple[environment.EnvState, chex.Array]:
     def _step(carry, _):
         k, _agent, _hidden_state, _state, _observation = carry
 
@@ -161,7 +161,7 @@ def test_policy(
 
         return (
             (k, _agent, new_hidden_state, new_state, new_observation),
-            (_observation, _reward[0]),
+            (new_state, _reward[0]),
         )
 
     key, observation, state, hidden_states = _reset_env(
@@ -173,14 +173,17 @@ def test_policy(
         n_agents,
     )
 
-    _, (obs_ts, reward_ts) = jax.lax.scan(
+    _, (state_ts, reward_ts) = jax.lax.scan(
         _step,
         (key, agent, hidden_states, state, observation),
         None,
         length=n_steps - static_kwargs["seq_len"],
     )
+
     burn_in = static_kwargs["burn_in"]
-    return obs_ts.at[burn_in:].get(), reward_ts.at[burn_in:].get()
+    state_ts = jax.tree_util.tree_map(lambda x: x.at[burn_in:].get(), state_ts)
+
+    return state_ts, reward_ts.at[burn_in:].get()
 
 
 @partial(

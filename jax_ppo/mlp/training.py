@@ -118,7 +118,7 @@ def test_policy(
 
         return (
             (k, _agent, new_state, new_observation),
-            (_observation, _reward[0]),
+            (new_state, _reward[0]),
         )
 
     key, reset_key = jax.random.split(key)
@@ -127,11 +127,11 @@ def test_policy(
     if n_agents is None:
         observation = observation[jnp.newaxis]
 
-    _, (obs_series, reward_series) = jax.lax.scan(
+    _, (state_series, reward_series) = jax.lax.scan(
         _step, (key, agent, state, observation), None, length=n_steps
     )
 
-    return obs_series, reward_series
+    return state_series, reward_series
 
 
 @partial(
