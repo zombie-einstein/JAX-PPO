@@ -163,6 +163,7 @@ def train(
     n_agents: typing.Optional[int] = None,
     n_env_steps: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
+    max_mini_batches: int = 10_000,
 ) -> typing.Tuple[
     jax.random.PRNGKey, data_types.Agent, typing.Dict, jnp.array, jnp.array
 ]:
@@ -185,12 +186,13 @@ def train(
         ppo_params: PPO training parameters
         greedy_test_policy: If ``True`` actions will be greedily sampled
             during the testing phase
+        max_mini_batches: Maximum number of mini-batches sampled each epoch
 
     Returns:
         - Updated JAX random key
         - Trained PPO agent
         - Dictionary of training data
-        - Time-series of trajectories generated during testing
+        - Time-series of environment state during testing
         - Reward time-series generate during testing
     """
 
@@ -210,6 +212,6 @@ def train(
         ppo_params,
         n_agents,
         greedy_test_policy,
-        10_000,
+        max_mini_batches,
         n_env_steps,
     )
