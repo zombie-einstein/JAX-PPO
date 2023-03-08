@@ -25,12 +25,16 @@ def _reset_env(
 ]:
     def warmup_step(carry, _):
         _observation, _state, k = carry
-        k, k1, k2 = jax.random.split(k, 3)
-        _action = env.action_space(env_params).sample(k1)
+        if n_agents is None:
+            _keys = jax.random.split(k, 3)
+            _action = env.action_space(env_params).sample(_keys[2])
+        else:
+            _keys = jax.random.split(k, 2 + n_agents)
+            _action = jax.vmap(env.action_space(env_params).sample)(_keys[2:])
         new_observation, new_state, _, _, _ = env.step_env(
-            k2, _state, _action, env_params
+            _keys[1], _state, _action, env_params
         )
-        return (new_observation, new_state, k), new_observation
+        return (new_observation, new_state, _keys[0]), new_observation
 
     key, reset_key = jax.random.split(key)
     observation, state = env.reset(reset_key, env_params)
@@ -40,10 +44,11 @@ def _reset_env(
     )
 
     if n_agents is None:
-        observations = observations[jnp.newaxis]
         batch_size = 1
+        observations = observations[jnp.newaxis]
     else:
         batch_size = n_agents
+        observations = jnp.swapaxes(observations, 0, 1)
 
     obs_size = np.prod(env.observation_space(env_params).shape)
     hidden_states = policy.initialise_carry(n_recurrent_layers, (batch_size,), obs_size)
@@ -59,7 +64,7 @@ def generate_samples(
     n_agents: typing.Optional[int],
     key: jax.random.PRNGKey,
     **static_kwargs,
-) -> recc_data_types.LSTMBatch:
+) -> recc_data_types.LSTMTrajectory:
     def _sample_step(carry, _):
         k, _agent, _hidden_state, _state, _observation = carry
 
@@ -81,7 +86,7 @@ def generate_samples(
             _done = jnp.array([_done])
 
         new_observation = jnp.hstack(
-            (_observation.at[:, 1:].get(), new_observation[jnp.newaxis])
+            (_observation.at[:, 1:].get(), new_observation[:, jnp.newaxis])
         )
 
         return (
@@ -121,7 +126,7 @@ def test_policy(
     env_params: environment.EnvParams,
     agent: data_types.Agent,
     n_steps: int,
-    n_agents: int,
+    n_agents: typing.Optional[int],
     key: jax.random.PRNGKey,
     greedy_policy: bool = False,
     **static_kwargs,
@@ -151,7 +156,7 @@ def test_policy(
             new_observation = new_observation[jnp.newaxis]
 
         new_observation = jnp.hstack(
-            (_observation.at[:, 1:].get(), new_observation[jnp.newaxis])
+            (_observation.at[:, 1:].get(), new_observation[:, jnp.newaxis])
         )
 
         return (
