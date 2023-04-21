@@ -130,7 +130,7 @@ def test_policy(
     key: jax.random.PRNGKey,
     greedy_policy: bool = False,
     **static_kwargs,
-) -> typing.Tuple[environment.EnvState, chex.Array]:
+) -> typing.Tuple[environment.EnvState, chex.Array, typing.Dict]:
     def _step(carry, _):
         k, _agent, _hidden_state, _state, _observation = carry
 
@@ -148,7 +148,7 @@ def test_policy(
             ) = algos.sample_actions(k, _agent, _observation, _hidden_state)
 
         k, k_step = jax.random.split(k)
-        new_observation, new_state, _reward, _done, _ = env.step_env(
+        new_observation, new_state, _reward, _done, _info = env.step_env(
             k_step, _state, _action, env_params
         )
 
@@ -161,7 +161,7 @@ def test_policy(
 
         return (
             (k, _agent, new_hidden_state, new_state, new_observation),
-            (new_state, _reward[0]),
+            (new_state, _reward[0], _info),
         )
 
     key, observation, state, hidden_states = _reset_env(
@@ -173,7 +173,7 @@ def test_policy(
         n_agents,
     )
 
-    _, (state_ts, reward_ts) = jax.lax.scan(
+    _, (state_ts, reward_ts, info_ts) = jax.lax.scan(
         _step,
         (key, agent, hidden_states, state, observation),
         None,
@@ -183,7 +183,7 @@ def test_policy(
     burn_in = static_kwargs["burn_in"]
     state_ts = jax.tree_util.tree_map(lambda x: x.at[burn_in:].get(), state_ts)
 
-    return state_ts, reward_ts.at[burn_in:].get()
+    return state_ts, reward_ts.at[burn_in:].get(), info_ts
 
 
 @partial(
@@ -228,6 +228,7 @@ def train(
     typing.Dict,
     jnp.array,
     jnp.array,
+    typing.Dict,
 ]:
 
     return runner.train(

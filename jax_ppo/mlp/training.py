@@ -110,7 +110,7 @@ def test_policy(
                 k, _agent, _observation
             )
         k, k_step = jax.random.split(k)
-        new_observation, new_state, _reward, _done, _ = env.step_env(
+        new_observation, new_state, _reward, _done, _info = env.step_env(
             k_step, _state, _action, env_params
         )
         if n_agents is None:
@@ -118,7 +118,7 @@ def test_policy(
 
         return (
             (k, _agent, new_state, new_observation),
-            (new_state, _reward[0]),
+            (new_state, _reward[0], _info),
         )
 
     key, reset_key = jax.random.split(key)
@@ -127,11 +127,11 @@ def test_policy(
     if n_agents is None:
         observation = observation[jnp.newaxis]
 
-    _, (state_series, reward_series) = jax.lax.scan(
+    _, (state_series, reward_series, info_ts) = jax.lax.scan(
         _step, (key, agent, state, observation), None, length=n_steps
     )
 
-    return state_series, reward_series
+    return state_series, reward_series, info_ts
 
 
 @partial(
@@ -165,7 +165,7 @@ def train(
     greedy_test_policy: bool = False,
     max_mini_batches: int = 10_000,
 ) -> typing.Tuple[
-    jax.random.PRNGKey, data_types.Agent, typing.Dict, jnp.array, jnp.array
+    jax.random.PRNGKey, data_types.Agent, typing.Dict, jnp.array, jnp.array, typing.Dict
 ]:
     """
     Train PPO agent in a Gymnax environment.
