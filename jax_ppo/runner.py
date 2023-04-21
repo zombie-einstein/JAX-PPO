@@ -40,6 +40,9 @@ def train(
     if n_env_steps is None:
         n_env_steps = env_params.max_steps_in_episode
 
+    test_keys = jax.random.split(key, n_test_env + 1)
+    key, test_keys = test_keys[0], test_keys[1:]
+
     @jax_tqdm.scan_tqdm(n_train, print_rate=1)
     def _train_step(carry, _):
         _key, _agent = carry
@@ -73,9 +76,6 @@ def train(
             **static_kwargs,
         )
 
-        _test_keys = jax.random.split(_key, n_test_env + 1)
-        _key, _test_keys = _test_keys[0], _test_keys[1:]
-
         _obs_ts, _rewards_ts, _info_ts = jax.vmap(
             partial(
                 test_policy_func,
@@ -87,7 +87,7 @@ def train(
                 greedy_policy=greedy_test_policy,
                 **static_kwargs,
             )
-        )(_test_keys)
+        )(test_keys)
 
         return (_key, _agent), (_losses, _obs_ts, _rewards_ts, _info_ts)
 
