@@ -34,6 +34,7 @@ def train(
     typing.Dict,
     jnp.array,
     jnp.array,
+    typing.Dict,
 ]:
 
     if n_env_steps is None:
@@ -75,7 +76,7 @@ def train(
         _test_keys = jax.random.split(_key, n_test_env + 1)
         _key, _test_keys = _test_keys[0], _test_keys[1:]
 
-        _obs_ts, _rewards_ts = jax.vmap(
+        _obs_ts, _rewards_ts, _info_ts = jax.vmap(
             partial(
                 test_policy_func,
                 env,
@@ -88,10 +89,10 @@ def train(
             )
         )(_test_keys)
 
-        return (_key, _agent), (_losses, _obs_ts, _rewards_ts)
+        return (_key, _agent), (_losses, _obs_ts, _rewards_ts, _info_ts)
 
-    (key, agent), (losses, obs_ts, rewards_ts) = jax.lax.scan(
+    (key, agent), (losses, obs_ts, rewards_ts, info_ts) = jax.lax.scan(
         _train_step, (key, agent), jnp.arange(n_train)
     )
 
-    return key, agent, losses, obs_ts, rewards_ts
+    return key, agent, losses, obs_ts, rewards_ts, info_ts

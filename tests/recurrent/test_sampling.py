@@ -59,7 +59,7 @@ def test_marl_policy_sampling(key, recurrent_agent, dummy_marl_env):
 def test_policy_testing(key, recurrent_agent, dummy_env):
     agent, _ = recurrent_agent
     burn_in = 3
-    state_ts, reward_ts = training.test_policy(
+    state_ts, reward_ts, _ = training.test_policy(
         env=dummy_env,
         env_params=dummy_env.default_params,
         agent=agent,
@@ -82,7 +82,7 @@ def test_policy_testing(key, recurrent_agent, dummy_env):
 def test_marl_policy_testing(key, recurrent_agent, dummy_marl_env):
     agent, _ = recurrent_agent
     burn_in = 3
-    state_ts, reward_ts = training.test_policy(
+    state_ts, reward_ts, _ = training.test_policy(
         env=dummy_marl_env,
         env_params=dummy_marl_env.default_params,
         agent=agent,
