@@ -131,7 +131,7 @@ def test_policy(
     _, (state_series, reward_series, info_ts) = jax.lax.scan(
         _step, (key, agent, state, observation), None, length=n_steps
     )
-    print(reward_series.shape)
+
     return state_series, reward_series, info_ts
 
 
