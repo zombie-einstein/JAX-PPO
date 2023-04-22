@@ -26,7 +26,7 @@ def train(
     n_agents: typing.Optional[int],
     greedy_test_policy: bool,
     max_mini_batches: int,
-    n_env_steps: typing.Optional[int],
+    n_env_steps: int,
     **static_kwargs,
 ) -> typing.Tuple[
     jax.random.PRNGKey,
@@ -36,9 +36,6 @@ def train(
     jnp.array,
     typing.Dict,
 ]:
-
-    if n_env_steps is None:
-        n_env_steps = env_params.max_steps_in_episode
 
     test_keys = jax.random.split(key, n_test_env + 1)
     key, test_keys = test_keys[0], test_keys[1:]

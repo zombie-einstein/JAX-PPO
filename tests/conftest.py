@@ -67,7 +67,7 @@ def dummy_env():
         def step_env(self, key, state: EnvState, action, params: EnvParams):
             new_state = EnvState(x=state.x + jnp.sum(action) + params.y, t=state.t + 1)
             new_obs = self.get_obs(new_state)
-            rewards = jnp.array([[2.0]])
+            rewards = 2.0
             dones = self.is_terminal(new_state, params)
             return new_obs, new_state, rewards, dones, dict()
 
@@ -124,7 +124,7 @@ def dummy_marl_env():
                 t=state.t + 1,
             )
             new_obs = self.get_obs(new_state)
-            rewards = jnp.arange(N_AGENTS, dtype=jnp.float32)[jnp.newaxis]
+            rewards = jnp.arange(N_AGENTS, dtype=jnp.float32)
             dones = self.is_terminal(new_state, params)
             return new_obs, new_state, rewards, dones, dict()
 

@@ -47,6 +47,7 @@ def generate_samples(
         if n_agents is None:
             new_observation = new_observation[jnp.newaxis]
             _done = jnp.array([_done])
+            _reward = jnp.array([_reward])
 
         return (
             (k, _agent, new_state, new_observation),
@@ -55,7 +56,7 @@ def generate_samples(
                 action=_action,
                 log_likelihood=_log_likelihood,
                 value=_value,
-                reward=_reward[0],
+                reward=_reward,
                 done=_done,
             ),
         )
@@ -118,7 +119,7 @@ def test_policy(
 
         return (
             (k, _agent, new_state, new_observation),
-            (new_state, _reward[0], _info),
+            (new_state, _reward, _info),
         )
 
     key, reset_key = jax.random.split(key)
@@ -130,7 +131,7 @@ def test_policy(
     _, (state_series, reward_series, info_ts) = jax.lax.scan(
         _step, (key, agent, state, observation), None, length=n_steps
     )
-
+    print(reward_series.shape)
     return state_series, reward_series, info_ts
 
 
@@ -138,7 +139,6 @@ def test_policy(
     jax.jit,
     static_argnames=(
         "env",
-        "env_params",
         "n_train",
         "n_train_env",
         "n_train_epochs",
@@ -160,8 +160,8 @@ def train(
     mini_batch_size: int,
     n_test_env: int,
     ppo_params: data_types.PPOParams,
+    n_env_steps: int,
     n_agents: typing.Optional[int] = None,
-    n_env_steps: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
     max_mini_batches: int = 10_000,
 ) -> typing.Tuple[

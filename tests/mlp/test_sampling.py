@@ -63,7 +63,7 @@ def test_policy_testing(key, mlp_agent, dummy_env):
         assert x.shape[0] == N_SAMPLES
 
     jax.tree_util.tree_map(test_shape, state_ts)
-    assert reward_ts.shape == (N_SAMPLES, 1)
+    assert reward_ts.shape == (N_SAMPLES,)
 
 
 def test_marl_policy_testing(key, mlp_agent, dummy_marl_env):
