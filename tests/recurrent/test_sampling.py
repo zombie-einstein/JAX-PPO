@@ -76,7 +76,7 @@ def test_policy_testing(key, recurrent_agent, dummy_env):
         assert x.shape[0] == n
 
     jax.tree_util.tree_map(test_shape, state_ts)
-    assert reward_ts.shape == (n, 1)
+    assert reward_ts.shape == (n,)
 
 
 def test_marl_policy_testing(key, recurrent_agent, dummy_marl_env):

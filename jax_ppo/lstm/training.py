@@ -84,6 +84,7 @@ def generate_samples(
         if n_agents is None:
             new_observation = new_observation[jnp.newaxis]
             _done = jnp.array([_done])
+            _reward = jnp.array([_reward])
 
         new_observation = jnp.hstack(
             (_observation.at[:, 1:].get(), new_observation[:, jnp.newaxis])
@@ -96,7 +97,7 @@ def generate_samples(
                 action=_action,
                 log_likelihood=_log_likelihood,
                 value=_value,
-                reward=_reward[0],
+                reward=_reward,
                 done=_done,
                 hidden_states=_hidden_state,
             ),
@@ -161,7 +162,7 @@ def test_policy(
 
         return (
             (k, _agent, new_hidden_state, new_state, new_observation),
-            (new_state, _reward[0], _info),
+            (new_state, _reward, _info),
         )
 
     key, observation, state, hidden_states = _reset_env(
@@ -190,7 +191,6 @@ def test_policy(
     jax.jit,
     static_argnames=(
         "env",
-        "env_params",
         "n_train",
         "n_train_env",
         "n_train_epochs",
@@ -218,8 +218,8 @@ def train(
     n_recurrent_layers: int,
     n_burn_in: int,
     ppo_params: data_types.PPOParams,
+    n_env_steps: int,
     n_agents: typing.Optional[int] = None,
-    n_env_steps: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
     max_mini_batches: int = 10_000,
 ) -> typing.Tuple[
