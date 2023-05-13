@@ -12,10 +12,10 @@ def observation():
 
 
 def test_policy_output_shapes(mlp_agent, observation):
-    mean, log_std, value = mlp_agent.apply_fn(mlp_agent.params, observation)
-    assert mean.shape == (N_AGENTS, N_ACTIONS)
+    mean, log_std, value = mlp_agent.apply_fn(mlp_agent.params, observation[0])
+    assert mean.shape == (N_ACTIONS,)
     assert log_std.shape == (N_ACTIONS,)
-    assert value.shape == (N_AGENTS, 1)
+    assert value.shape == ()
 
 
 def test_policy_sampling_shape(key, mlp_agent, observation):

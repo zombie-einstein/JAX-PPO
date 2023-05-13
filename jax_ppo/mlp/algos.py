@@ -11,7 +11,7 @@ from jax_ppo.mlp.data_types import Batch, Trajectory
 
 @partial(jax.jit, static_argnames="apply_fn")
 def policy(apply_fn, params, state):
-    mean, log_std, value = apply_fn(params, state)
+    mean, log_std, value = jax.vmap(apply_fn, in_axes=(None, 0))(params, state)
     return mean, log_std, value
 
 
@@ -20,7 +20,7 @@ def sample_actions(key: jax.random.PRNGKey, agent: Agent, state):
     key, sub_key = jax.random.split(key)
     dist = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
     actions, log_likelihood = dist.sample_and_log_prob(seed=sub_key)
-    return key, actions, log_likelihood, value[:, 0]
+    return key, actions, log_likelihood, value
 
 
 def max_action(agent: Agent, state):

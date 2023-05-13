@@ -18,8 +18,7 @@ class ActorCritic(linen.module.Module):
     @linen.compact
     def __call__(self, x):
 
-        value = x
-        mean = x
+        value, mean = x, x
 
         for _ in range(self.n_layers):
             value = linen.Dense(self.layer_width, **layer_init())(value)
@@ -35,4 +34,4 @@ class ActorCritic(linen.module.Module):
             "log_std", linen.initializers.zeros, (self.single_action_shape,)
         )
 
-        return mean, log_std, value
+        return mean, log_std, value[0]

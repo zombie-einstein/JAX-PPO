@@ -9,11 +9,10 @@ N_SAMPLES = 11
 
 
 def test_policy_sampling(key, recurrent_agent, dummy_env):
-    agent, _ = recurrent_agent
     trajectories = training.generate_samples(
         env=dummy_env,
         env_params=dummy_env.default_params,
-        agent=agent,
+        agent=recurrent_agent,
         n_samples=N_SAMPLES,
         n_agents=None,
         key=key,
@@ -33,11 +32,10 @@ def test_policy_sampling(key, recurrent_agent, dummy_env):
 
 
 def test_marl_policy_sampling(key, recurrent_agent, dummy_marl_env):
-    agent, _ = recurrent_agent
     trajectories = training.generate_samples(
         env=dummy_marl_env,
         env_params=dummy_marl_env.default_params,
-        agent=agent,
+        agent=recurrent_agent,
         n_samples=N_SAMPLES,
         n_agents=N_AGENTS,
         key=key,
@@ -57,12 +55,11 @@ def test_marl_policy_sampling(key, recurrent_agent, dummy_marl_env):
 
 
 def test_policy_testing(key, recurrent_agent, dummy_env):
-    agent, _ = recurrent_agent
     burn_in = 3
     state_ts, reward_ts, _ = training.test_policy(
         env=dummy_env,
         env_params=dummy_env.default_params,
-        agent=agent,
+        agent=recurrent_agent,
         n_steps=N_SAMPLES,
         n_agents=None,
         key=key,
@@ -80,12 +77,11 @@ def test_policy_testing(key, recurrent_agent, dummy_env):
 
 
 def test_marl_policy_testing(key, recurrent_agent, dummy_marl_env):
-    agent, _ = recurrent_agent
     burn_in = 3
     state_ts, reward_ts, _ = training.test_policy(
         env=dummy_marl_env,
         env_params=dummy_marl_env.default_params,
-        agent=agent,
+        agent=recurrent_agent,
         n_steps=N_SAMPLES,
         n_agents=N_AGENTS,
         key=key,
