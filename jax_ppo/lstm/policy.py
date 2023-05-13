@@ -2,6 +2,7 @@ import typing
 from functools import partial
 
 import jax
+import jax.numpy as jnp
 from flax import linen
 
 from jax_ppo.lstm.data_types import HiddenStates
@@ -12,8 +13,8 @@ class _LSTMLayer(linen.Module):
     @partial(
         linen.transforms.scan,
         variable_broadcast="params",
-        in_axes=1,
-        out_axes=1,
+        in_axes=0,
+        out_axes=0,
         split_rngs={"params": False},
     )
     @linen.compact
@@ -40,8 +41,8 @@ class RecurrentActorCritic(linen.Module):
 
         new_hidden_states = tuple(new_hidden_states)
 
-        value = x.reshape(x.shape[0], -1)
-        mean = x.reshape(x.shape[0], -1)
+        x = jnp.reshape(x, (-1,))
+        value, mean = x, x
 
         for _ in range(self.n_layers):
             value = linen.Dense(self.layer_width, **layer_init())(value)
@@ -57,7 +58,7 @@ class RecurrentActorCritic(linen.Module):
             "log_std", linen.initializers.zeros, (self.single_action_shape,)
         )
 
-        return mean, log_std, value, new_hidden_states
+        return mean, log_std, value[0], new_hidden_states
 
 
 def initialise_carry(

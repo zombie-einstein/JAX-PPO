@@ -25,7 +25,6 @@ def mlp_agent(key):
         (N_ACTIONS,),
         (N_OBS,),
         0.01,
-        n_agents=1,
         layer_width=8,
         n_layers=1,
     )
@@ -34,18 +33,17 @@ def mlp_agent(key):
 
 @pytest.fixture
 def recurrent_agent(key):
-    _, agent, hidden_states = jax_ppo.init_lstm_agent(
+    _, agent = jax_ppo.init_lstm_agent(
         key,
         jax_ppo.default_params,
         (N_ACTIONS,),
         (N_OBS,),
         0.01,
         SEQ_LEN,
-        n_agents=N_AGENTS,
         layer_width=8,
         n_layers=1,
     )
-    return agent, hidden_states
+    return agent
 
 
 @pytest.fixture

@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 import pytest
 
+from jax_ppo import initialise_carry
 from jax_ppo.lstm import algos
 
 from ..conftest import N_ACTIONS, N_AGENTS, N_OBS, SEQ_LEN
@@ -12,19 +13,19 @@ def observation():
 
 
 def test_policy_output_shapes(recurrent_agent, observation):
-    agent, hidden_states = recurrent_agent
-    mean, log_std, value, new_hidden_states = agent.apply_fn(
-        agent.params, observation, hidden_states
+    hidden_states = initialise_carry(1, (), N_OBS)
+    mean, log_std, value, new_hidden_states = recurrent_agent.apply_fn(
+        recurrent_agent.params, observation[0], hidden_states
     )
-    assert mean.shape == (N_AGENTS, N_ACTIONS)
+    assert mean.shape == (N_ACTIONS,)
     assert log_std.shape == (N_ACTIONS,)
-    assert value.shape == (N_AGENTS, 1)
+    assert value.shape == ()
 
 
 def test_policy_sampling_shape(key, recurrent_agent, observation):
-    agent, hidden_states = recurrent_agent
+    hidden_states = initialise_carry(1, (N_AGENTS,), N_OBS)
     _, actions, log_likelihood, values, new_hidden_states = algos.sample_actions(
-        key, agent, observation, hidden_states
+        key, recurrent_agent, observation, hidden_states
     )
     assert actions.shape == (N_AGENTS, N_ACTIONS)
     assert log_likelihood.shape == (N_AGENTS,)
@@ -32,6 +33,8 @@ def test_policy_sampling_shape(key, recurrent_agent, observation):
 
 
 def test_greedy_policy_sampling(recurrent_agent, observation):
-    agent, hidden_states = recurrent_agent
-    actions, new_hidden_states = algos.max_action(agent, observation, hidden_states)
+    hidden_states = initialise_carry(1, (N_AGENTS,), N_OBS)
+    actions, new_hidden_states = algos.max_action(
+        recurrent_agent, observation, hidden_states
+    )
     assert actions.shape == (N_AGENTS, N_ACTIONS)

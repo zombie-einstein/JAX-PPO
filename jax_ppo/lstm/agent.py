@@ -7,7 +7,6 @@ import optax
 from flax import linen
 
 from jax_ppo.data_types import Agent, PPOParams
-from jax_ppo.lstm.data_types import HiddenStates
 
 from .policy import RecurrentActorCritic, initialise_carry
 
@@ -19,12 +18,11 @@ def init_lstm_agent(
     observation_space_shape: typing.Tuple[int, ...],
     schedule: typing.Union[float, optax._src.base.Schedule],
     seq_len: int,
-    n_agents: int = 1,
     layer_width: int = 64,
     n_layers: int = 2,
     n_recurrent_layers: int = 1,
     activation: linen.activation = linen.tanh,
-) -> typing.Tuple[jax.random.PRNGKey, Agent, HiddenStates]:
+) -> typing.Tuple[jax.random.PRNGKey, Agent]:
 
     observation_size = np.prod(observation_space_shape)
 
@@ -42,19 +40,13 @@ def init_lstm_agent(
             learning_rate=schedule, eps=ppo_params.adam_eps
         ),
     )
-    fake_args_model = jnp.zeros(
-        (
-            n_agents,
-            seq_len,
-        )
-        + observation_space_shape
-    )
+    fake_args_model = jnp.zeros((seq_len,) + observation_space_shape)
 
-    hidden_states = initialise_carry(n_recurrent_layers, (n_agents,), observation_size)
+    hidden_states = initialise_carry(n_recurrent_layers, (), observation_size)
 
     key, sub_key = jax.random.split(key)
     params_model = policy.init(sub_key, fake_args_model, hidden_states)
 
     agent = Agent.create(apply_fn=policy.apply, params=params_model, tx=tx)
 
-    return key, agent, hidden_states
+    return key, agent
