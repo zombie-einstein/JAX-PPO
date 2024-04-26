@@ -13,7 +13,7 @@ keywords = ["jax", "rl", "ppo"]
 python = ">=3.10,<3.12"
 flax = "^0.8.2"
 distrax = "^0.1.5"
-jax-tqdm = "^0.2.0"
+jax-tqdm = "0.2.0"
 gymnax = "^0.0.8"
 scipy = ">=1.13.0"
 
