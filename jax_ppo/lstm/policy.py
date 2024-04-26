@@ -19,7 +19,7 @@ class _LSTMLayer(linen.Module):
     )
     @linen.compact
     def __call__(self, carry, x):
-        return linen.OptimizedLSTMCell()(carry, x)
+        return linen.OptimizedLSTMCell(x.shape[0])(carry, x)
 
 
 class RecurrentActorCritic(linen.Module):
@@ -68,7 +68,9 @@ def initialise_carry(
 
     return tuple(
         [
-            linen.OptimizedLSTMCell.initialize_carry(k, batch_dims, hidden_size)
+            linen.OptimizedLSTMCell(features=hidden_size).initialize_carry(
+                k, batch_dims + (hidden_size,)
+            )
             for _ in range(n_layers)
         ]
     )
