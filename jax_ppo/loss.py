@@ -19,7 +19,7 @@ def calculate_losses(
     batch = jax.lax.stop_gradient(batch)
     clip_coeff = ppo_params.clip_coeff
 
-    if type(batch) == LSTMBatch:
+    if isinstance(batch, LSTMBatch):
         mean, log_std, new_value, _ = lstm_policy(
             apply_fn, params, batch.state, batch.hidden_states
         )

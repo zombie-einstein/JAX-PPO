@@ -1,8 +1,8 @@
 import typing
 from functools import partial
 
+import chex
 import jax
-import jax.numpy as jnp
 from gymnax.environments import environment
 
 from jax_ppo import data_types, runner
@@ -15,8 +15,7 @@ def generate_samples(
     env_params: environment.EnvParams,
     agent: data_types.Agent,
     n_samples: int,
-    n_agents: typing.Optional[int],
-    key: jax.random.PRNGKey,
+    key: chex.PRNGKey,
 ) -> mlp_data_type.Trajectory:
     """
     Generate batch of trajectories from an agent an environment.
@@ -27,7 +26,6 @@ def generate_samples(
         env_params: Gymnax environment parameters
         agent: JAX-PPO agent
         n_samples: Number of samples to generate
-        n_agents: Number of agents in the training environment
 
     Returns:
         - JAX random key
@@ -44,11 +42,6 @@ def generate_samples(
             k_step, _state, _action, env_params
         )
 
-        if n_agents is None:
-            new_observation = new_observation[jnp.newaxis]
-            _done = jnp.array([_done])
-            _reward = jnp.array([_reward])
-
         return (
             (k, _agent, new_state, new_observation),
             mlp_data_type.Trajectory(
@@ -64,9 +57,6 @@ def generate_samples(
     key, reset_key = jax.random.split(key)
     observation, state = env.reset(reset_key, env_params)
 
-    if n_agents is None:
-        observation = observation[jnp.newaxis]
-
     _, trajectories = jax.lax.scan(
         _sample_step, (key, agent, state, observation), None, length=n_samples + 1
     )
@@ -79,8 +69,7 @@ def test_policy(
     env_params: environment.EnvParams,
     agent: data_types.Agent,
     n_steps: int,
-    n_agents: typing.Optional[int],
-    key: jax.random.PRNGKey,
+    key: chex.PRNGKey,
     greedy_policy: bool = False,
 ):
     """
@@ -92,7 +81,6 @@ def test_policy(
         env_params: Gymnax environment parameters
         agent: JAX-PPO agent
         n_steps: Number of test steps
-        n_agents: Number of agents in training environment
         greedy_policy: If ``True`` testing will greedily sample actions.
 
     Returns:
@@ -114,9 +102,6 @@ def test_policy(
         new_observation, new_state, _reward, _done, _info = env.step_env(
             k_step, _state, _action, env_params
         )
-        if n_agents is None:
-            new_observation = new_observation[jnp.newaxis]
-
         return (
             (k, _agent, new_state, new_observation),
             (new_state, _reward, _info),
@@ -124,9 +109,6 @@ def test_policy(
 
     key, reset_key = jax.random.split(key)
     observation, state = env.reset(reset_key, env_params)
-
-    if n_agents is None:
-        observation = observation[jnp.newaxis]
 
     _, (state_series, reward_series, info_ts) = jax.lax.scan(
         _step, (key, agent, state, observation), None, length=n_steps
@@ -144,7 +126,6 @@ def test_policy(
         "n_train_epochs",
         "mini_batch_size",
         "n_test_env",
-        "n_agents",
         "n_env_steps",
         "greedy_test_policy",
     ),
@@ -161,11 +142,10 @@ def train(
     n_test_env: int,
     ppo_params: data_types.PPOParams,
     n_env_steps: int,
-    n_agents: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
     max_mini_batches: int = 10_000,
 ) -> typing.Tuple[
-    jax.random.PRNGKey, data_types.Agent, typing.Dict, jnp.array, jnp.array, typing.Dict
+    chex.PRNGKey, data_types.Agent, typing.Dict, chex.Array, chex.Array, typing.Dict
 ]:
     """
     Train PPO agent in a Gymnax environment.
@@ -181,7 +161,6 @@ def train(
         n_train_epochs: Number of training update epochs from samples
         mini_batch_size: Mini batch size drawn from samples
         n_test_env: Number of environments to use for testing
-        n_agents: Number of agents in training environment
         n_env_steps: Number of environment steps to run
         ppo_params: PPO training parameters
         greedy_test_policy: If ``True`` actions will be greedily sampled
@@ -210,7 +189,6 @@ def train(
         mini_batch_size,
         n_test_env,
         ppo_params,
-        n_agents,
         greedy_test_policy,
         max_mini_batches,
         n_env_steps,

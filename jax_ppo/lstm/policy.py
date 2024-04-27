@@ -26,7 +26,7 @@ class RecurrentActorCritic(linen.Module):
     layer_width: int
     n_layers: int
     n_recurrent_layers: int
-    single_action_shape: int
+    n_actions: int
     activation: linen.activation
 
     @linen.compact
@@ -52,11 +52,9 @@ class RecurrentActorCritic(linen.Module):
             mean = self.activation(mean)
 
         value = linen.Dense(1, **layer_init(scale=1.0))(value)
-        mean = linen.Dense(self.single_action_shape, **layer_init(scale=0.01))(mean)
+        mean = linen.Dense(self.n_actions, **layer_init(scale=0.01))(mean)
 
-        log_std = self.param(
-            "log_std", linen.initializers.zeros, (self.single_action_shape,)
-        )
+        log_std = self.param("log_std", linen.initializers.zeros, (self.n_actions,))
 
         return mean, log_std, value[0], new_hidden_states
 

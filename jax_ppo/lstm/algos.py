@@ -1,5 +1,7 @@
 from functools import partial
+from typing import Tuple
 
+import chex
 import distrax
 import jax
 import jax.numpy as jnp
@@ -11,19 +13,17 @@ from .data_types import HiddenStates, LSTMBatch, LSTMTrajectory
 
 
 @partial(jax.jit, static_argnames="apply_fn")
-def policy(apply_fn, params, state, hidden_states: HiddenStates):
-    mean, log_std, value, hidden_states = jax.vmap(apply_fn, in_axes=(None, 0, 0))(
-        params, state, hidden_states
-    )
+def policy(apply_fn, params, state: chex.Array, hidden_states: HiddenStates):
+    mean, log_std, value, hidden_states = apply_fn(params, state, hidden_states)
     return mean, log_std, value, hidden_states
 
 
 def sample_actions(
-    key: jax.random.PRNGKey,
+    key: chex.PRNGKey,
     agent: Agent,
-    state,
+    state: chex.Array,
     hidden_states: HiddenStates,
-):
+) -> Tuple[chex.PRNGKey, chex.Array, chex.Array, chex.Array, HiddenStates]:
     mean, log_std, value, hidden_states = policy(
         agent.apply_fn, agent.params, state, hidden_states
     )
@@ -33,8 +33,10 @@ def sample_actions(
     return key, actions, log_likelihood, value, hidden_states
 
 
-def max_action(agent: Agent, state, hidden_states: HiddenStates):
-    mean, log_std, value, hidden_states = policy(
+def max_action(
+    agent: Agent, state, hidden_states: HiddenStates
+) -> Tuple[chex.Array, HiddenStates]:
+    mean, _, _, hidden_states = policy(
         agent.apply_fn, agent.params, state, hidden_states
     )
     return mean, hidden_states

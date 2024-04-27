@@ -19,22 +19,17 @@ def _reset_env(
     env_params: environment.EnvParams,
     seq_len: int,
     n_recurrent_layers: int,
-    n_agents: typing.Optional[int],
 ) -> typing.Tuple[
     chex.PRNGKey, chex.Array, environment.EnvState, recc_data_types.HiddenStates
 ]:
     def warmup_step(carry, _):
         _observation, _state, k = carry
-        if n_agents is None:
-            _keys = jax.random.split(k, 3)
-            _action = env.action_space(env_params).sample(_keys[2])
-        else:
-            _keys = jax.random.split(k, 2 + n_agents)
-            _action = jax.vmap(env.action_space(env_params).sample)(_keys[2:])
+        k, sample_key, step_key = jax.random.split(k, 3)
+        _action = env.action_space(env_params).sample(sample_key)
         new_observation, new_state, _, _, _ = env.step_env(
-            _keys[1], _state, _action, env_params
+            step_key, _state, _action, env_params
         )
-        return (new_observation, new_state, _keys[0]), new_observation
+        return (new_observation, new_state, k), new_observation
 
     key, reset_key = jax.random.split(key)
     observation, state = env.reset(reset_key, env_params)
@@ -43,15 +38,8 @@ def _reset_env(
         warmup_step, (observation, state, key), None, length=seq_len
     )
 
-    if n_agents is None:
-        batch_size = 1
-        observations = observations[jnp.newaxis]
-    else:
-        batch_size = n_agents
-        observations = jnp.swapaxes(observations, 0, 1)
-
     obs_size = np.prod(env.observation_space(env_params).shape)
-    hidden_states = policy.initialise_carry(n_recurrent_layers, (batch_size,), obs_size)
+    hidden_states = policy.initialise_carry(n_recurrent_layers, (), obs_size)
 
     return key, observations, state, hidden_states
 
@@ -61,7 +49,6 @@ def generate_samples(
     env_params: environment.EnvParams,
     agent: data_types.Agent,
     n_samples: int,
-    n_agents: typing.Optional[int],
     key: jax.random.PRNGKey,
     **static_kwargs,
 ) -> recc_data_types.LSTMTrajectory:
@@ -81,13 +68,8 @@ def generate_samples(
             k_step, _state, _action, env_params
         )
 
-        if n_agents is None:
-            new_observation = new_observation[jnp.newaxis]
-            _done = jnp.array([_done])
-            _reward = jnp.array([_reward])
-
-        new_observation = jnp.hstack(
-            (_observation.at[:, 1:].get(), new_observation[:, jnp.newaxis])
+        new_observation = jnp.vstack(
+            (_observation.at[1:].get(), new_observation[jnp.newaxis])
         )
 
         return (
@@ -109,7 +91,6 @@ def generate_samples(
         env_params,
         static_kwargs["seq_len"],
         static_kwargs["n_recurrent_layers"],
-        n_agents,
     )
 
     _, trajectories = jax.lax.scan(
@@ -127,7 +108,6 @@ def test_policy(
     env_params: environment.EnvParams,
     agent: data_types.Agent,
     n_steps: int,
-    n_agents: typing.Optional[int],
     key: jax.random.PRNGKey,
     greedy_policy: bool = False,
     **static_kwargs,
@@ -153,11 +133,8 @@ def test_policy(
             k_step, _state, _action, env_params
         )
 
-        if n_agents is None:
-            new_observation = new_observation[jnp.newaxis]
-
-        new_observation = jnp.hstack(
-            (_observation.at[:, 1:].get(), new_observation[:, jnp.newaxis])
+        new_observation = jnp.vstack(
+            (_observation.at[1:].get(), new_observation[jnp.newaxis])
         )
 
         return (
@@ -171,7 +148,6 @@ def test_policy(
         env_params,
         static_kwargs["seq_len"],
         static_kwargs["n_recurrent_layers"],
-        n_agents,
     )
 
     _, (state_ts, reward_ts, info_ts) = jax.lax.scan(
@@ -199,7 +175,6 @@ def test_policy(
         "seq_len",
         "n_recurrent_layers",
         "n_burn_in",
-        "n_agents",
         "n_env_steps",
         "greedy_test_policy",
     ),
@@ -219,7 +194,6 @@ def train(
     n_burn_in: int,
     ppo_params: data_types.PPOParams,
     n_env_steps: int,
-    n_agents: typing.Optional[int] = None,
     greedy_test_policy: bool = False,
     max_mini_batches: int = 10_000,
 ) -> typing.Tuple[
@@ -245,7 +219,6 @@ def train(
         mini_batch_size,
         n_test_env,
         ppo_params,
-        n_agents,
         greedy_test_policy,
         max_mini_batches,
         n_env_steps,

@@ -14,9 +14,9 @@ from .policy import RecurrentActorCritic, initialise_carry
 def init_lstm_agent(
     key: jax.random.PRNGKey,
     ppo_params: PPOParams,
-    action_space_shape: typing.Tuple[int, ...],
+    n_actions: int,
     observation_space_shape: typing.Tuple[int, ...],
-    schedule: typing.Union[float, optax._src.base.Schedule],
+    schedule: typing.Union[float, optax.Schedule],
     seq_len: int,
     layer_width: int = 64,
     n_layers: int = 2,
@@ -30,7 +30,7 @@ def init_lstm_agent(
         layer_width=layer_width,
         n_layers=n_layers,
         n_recurrent_layers=n_recurrent_layers,
-        single_action_shape=np.prod(action_space_shape),
+        n_actions=n_actions,
         activation=activation,
     )
 
