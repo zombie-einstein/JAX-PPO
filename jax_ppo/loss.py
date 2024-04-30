@@ -20,11 +20,13 @@ def calculate_losses(
     clip_coeff = ppo_params.clip_coeff
 
     if isinstance(batch, LSTMBatch):
-        mean, log_std, new_value, _ = lstm_policy(
+        mean, log_std, new_value, _ = jax.vmap(lstm_policy, in_axes=(None, None, 0, 0))(
             apply_fn, params, batch.state, batch.hidden_states
         )
     else:
-        mean, log_std, new_value = policy(apply_fn, params, batch.state)
+        mean, log_std, new_value = jax.vmap(policy, in_axes=(None, None, 0))(
+            apply_fn, params, batch.state
+        )
 
     new_value = jnp.squeeze(new_value)
 
