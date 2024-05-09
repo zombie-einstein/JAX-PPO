@@ -39,7 +39,7 @@ def train(
     test_keys = jax.random.split(key, n_test_env + 1)
     key, test_keys = test_keys[0], test_keys[1:]
 
-    @jax_tqdm.scan_tqdm(n_train, print_rate=1)
+    @jax_tqdm.scan_tqdm(n_train, print_rate=10)
     def _train_step(carry, _):
         _key, _agent = carry
 
