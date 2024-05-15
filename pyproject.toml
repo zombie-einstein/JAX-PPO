@@ -15,7 +15,7 @@ jax = "0.4.26"
 jaxlib = "0.4.26"
 flax = "^0.8.2"
 distrax = "^0.1.5"
-jax-tqdm = "0.2.0"
+jax-tqdm = ">=0.2.1"
 gymnax = "^0.0.8"
 scipy = ">=1.13.0"
 

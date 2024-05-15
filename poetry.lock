@@ -1277,13 +1277,13 @@ tpu = ["jaxlib (==0.4.26)", "libtpu-nightly (==0.1.dev20240403)", "requests"]
 
 [[package]]
 name = "jax-tqdm"
-version = "0.2.0"
+version = "0.2.1"
 description = "Tqdm progress bar for JAX scans and loops"
 optional = false
 python-versions = "<4.0,>=3.9"
 files = [
-    {file = "jax_tqdm-0.2.0-py3-none-any.whl", hash = "sha256:09c2afabe0804d4f489a49f6b036d5cc0603f2f2e1dcc424506ece8977154af9"},
-    {file = "jax_tqdm-0.2.0.tar.gz", hash = "sha256:466db74e4326af2745d9789c8719309af7a48aacb3e0543a49f42ea169d41c87"},
+    {file = "jax_tqdm-0.2.1-py3-none-any.whl", hash = "sha256:968b26b74636d9d78c3ff41085a6beb4c1e44116bcd581144a39ad7e088f7cea"},
+    {file = "jax_tqdm-0.2.1.tar.gz", hash = "sha256:6a70971e231d3930a8beda5032e39498ae06f9c4ba645a4cf7c02cd363eba991"},
 ]
 
 [package.dependencies]
@@ -2323,13 +2323,13 @@ test = ["dm-tree (>=0.1.7)", "flax (>=0.5.3)"]
 
 [[package]]
 name = "orbax-checkpoint"
-version = "0.5.10"
+version = "0.5.11"
 description = "Orbax Checkpoint"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "orbax_checkpoint-0.5.10-py3-none-any.whl", hash = "sha256:377dd952410038731486e5fbbb91704e0feb027c2d4faf1f56f5276bcb01ee51"},
-    {file = "orbax_checkpoint-0.5.10.tar.gz", hash = "sha256:2e00657383c6fcdc3209203c32d95decad798d975ec5973592e5e32d40455d80"},
+    {file = "orbax_checkpoint-0.5.11-py3-none-any.whl", hash = "sha256:a0950119f6fece0d2e2d84e04c6ca2136b6c2a59ef996927765f8511d8ee4139"},
+    {file = "orbax_checkpoint-0.5.11.tar.gz", hash = "sha256:64161132c83888c2ccee4db80078914507e5f35ad47bcf5bfc5fa2b07036a2a7"},
 ]
 
 [package.dependencies]
@@ -2570,13 +2570,13 @@ xmp = ["defusedxml"]
 
 [[package]]
 name = "platformdirs"
-version = "4.2.1"
+version = "4.2.2"
 description = "A small Python package for determining appropriate platform-specific dirs, e.g. a `user data dir`."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "platformdirs-4.2.1-py3-none-any.whl", hash = "sha256:17d5a1161b3fd67b390023cb2d3b026bbd40abde6fdb052dfbd3a29c3ba22ee1"},
-    {file = "platformdirs-4.2.1.tar.gz", hash = "sha256:031cd18d4ec63ec53e82dceaac0417d218a6863f7745dfcc9efe7793b7039bdf"},
+    {file = "platformdirs-4.2.2-py3-none-any.whl", hash = "sha256:2d7a1657e36a80ea911db832a8a6ece5ee53d8de21edd5cc5879af6530b1bfee"},
+    {file = "platformdirs-4.2.2.tar.gz", hash = "sha256:38b7b51f512eed9e84a22788b4bce1de17c0adb134d6becb09836e37d8654cd3"},
 ]
 
 [package.extras]
@@ -3642,13 +3642,13 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "virtualenv"
-version = "20.26.1"
+version = "20.26.2"
 description = "Virtual Python Environment builder"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "virtualenv-20.26.1-py3-none-any.whl", hash = "sha256:7aa9982a728ae5892558bff6a2839c00b9ed145523ece2274fad6f414690ae75"},
-    {file = "virtualenv-20.26.1.tar.gz", hash = "sha256:604bfdceaeece392802e6ae48e69cec49168b9c5f4a44e483963f9242eb0e78b"},
+    {file = "virtualenv-20.26.2-py3-none-any.whl", hash = "sha256:a624db5e94f01ad993d476b9ee5346fdf7b9de43ccaee0e0197012dc838a0e9b"},
+    {file = "virtualenv-20.26.2.tar.gz", hash = "sha256:82bf0f4eebbb78d36ddaee0283d43fe5736b53880b8a8cdcd37390a07ac3741c"},
 ]
 
 [package.dependencies]
@@ -3742,4 +3742,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<3.12"
-content-hash = "cd37d18f17c448f5d874b5499a7861290155a0b792fecef5dcd974852e5908f8"
+content-hash = "a7350259a00f845f82d3e5837439242a6c53cf9ccca931b2cc91a2d73bb6c23b"
