@@ -23,7 +23,6 @@ def train(
     mini_batch_size: int,
     n_test_env: int,
     ppo_params: data_types.PPOParams,
-    n_agents: typing.Optional[int],
     greedy_test_policy: bool,
     max_mini_batches: int,
     n_env_steps: int,
@@ -40,7 +39,7 @@ def train(
     test_keys = jax.random.split(key, n_test_env + 1)
     key, test_keys = test_keys[0], test_keys[1:]
 
-    @jax_tqdm.scan_tqdm(n_train, print_rate=1)
+    @jax_tqdm.scan_tqdm(n_train, print_rate=10)
     def _train_step(carry, _):
         _key, _agent = carry
 
@@ -54,7 +53,6 @@ def train(
                 env_params,
                 _agent,
                 n_env_steps,
-                n_agents,
                 **static_kwargs,
             )
         )(
@@ -80,7 +78,6 @@ def train(
                 env_params,
                 _agent,
                 n_env_steps,
-                n_agents,
                 greedy_policy=greedy_test_policy,
                 **static_kwargs,
             )

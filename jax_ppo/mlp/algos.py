@@ -1,6 +1,9 @@
 from functools import partial
+from typing import Tuple
 
+import chex
 import distrax
+import flax
 import jax
 import jax.numpy as jnp
 
@@ -10,12 +13,16 @@ from jax_ppo.mlp.data_types import Batch, Trajectory
 
 
 @partial(jax.jit, static_argnames="apply_fn")
-def policy(apply_fn, params, state):
-    mean, log_std, value = jax.vmap(apply_fn, in_axes=(None, 0))(params, state)
+def policy(
+    apply_fn, params: flax.core.FrozenDict, state: chex.Array
+) -> Tuple[chex.Array, chex.Array, chex.Array]:
+    mean, log_std, value = apply_fn(params, state)
     return mean, log_std, value
 
 
-def sample_actions(key: jax.random.PRNGKey, agent: Agent, state):
+def sample_actions(
+    key: chex.PRNGKey, agent: Agent, state: chex.Array
+) -> Tuple[chex.PRNGKey, chex.Array, chex.Array, chex.Array]:
     mean, log_std, value = policy(agent.apply_fn, agent.params, state)
     key, sub_key = jax.random.split(key)
     dist = distrax.MultivariateNormalDiag(mean, jnp.exp(log_std))
@@ -23,9 +30,8 @@ def sample_actions(key: jax.random.PRNGKey, agent: Agent, state):
     return key, actions, log_likelihood, value
 
 
-def max_action(agent: Agent, state):
-    mean, log_std, value = policy(agent.apply_fn, agent.params, state)
-    return mean
+def max_action(agent: Agent, state: chex.Array) -> chex.Array:
+    return policy(agent.apply_fn, agent.params, state)[0]
 
 
 def prepare_batch(ppo_params: PPOParams, trajectories: Trajectory) -> Batch:

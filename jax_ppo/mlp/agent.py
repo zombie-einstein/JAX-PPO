@@ -3,7 +3,6 @@ import typing
 import flax
 import jax
 import jax.numpy as jnp
-import numpy as np
 import optax
 
 from jax_ppo.data_types import Agent, PPOParams
@@ -13,9 +12,9 @@ from jax_ppo.mlp.policy import ActorCritic
 def init_agent(
     key: jax.random.PRNGKey,
     ppo_params: PPOParams,
-    action_space_shape: typing.Tuple[int, ...],
     observation_space_shape: typing.Tuple[int, ...],
-    schedule: typing.Union[float, optax._src.base.Schedule],
+    n_actions: int,
+    schedule: typing.Union[float, optax.Schedule],
     layer_width: int = 64,
     n_layers: int = 2,
     activation: flax.linen.activation = flax.linen.tanh,
@@ -24,7 +23,7 @@ def init_agent(
     policy = ActorCritic(
         layer_width=layer_width,
         n_layers=n_layers,
-        single_action_shape=np.prod(action_space_shape),
+        n_actions=n_actions,
         activation=activation,
     )
 

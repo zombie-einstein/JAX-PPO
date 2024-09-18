@@ -140,9 +140,8 @@ def train_step_with_refresh(
 
         batches = jax.vmap(prepare_batch, in_axes=(None, 0))(ppo_params, trajectories)
         batches = jax.tree_util.tree_map(
-            lambda x: jnp.reshape(x, (np.prod(x.shape[:3]),) + x.shape[3:]), batches
+            lambda x: jnp.reshape(x, (np.prod(x.shape[:2]),) + x.shape[2:]), batches
         )
-
         batch_size = batches.state.shape[0]
         n_samples = batch_size - (batch_size % mini_batch_size)
         n_samples = min(n_samples, max_mini_batches * mini_batch_size)
