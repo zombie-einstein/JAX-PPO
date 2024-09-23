@@ -99,7 +99,6 @@ reaches a terminal state (i.e. if the episode completes during the burn-in perio
 
 - Early stopping based on the KL-divergence is not implemented.
 - Benchmark against other reference implementations.
-- Recalculate advantages during policy update.
 - Recalculate hidden states during policy update.
 
 ## Developer Notes

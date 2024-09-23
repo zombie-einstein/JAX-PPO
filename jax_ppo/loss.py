@@ -40,13 +40,13 @@ def calculate_losses(
 
     # Policy Loss
     p_loss_1 = adv * ratio
-    p_loss_2 = adv * jnp.clip(ratio, a_min=1 - clip_coeff, a_max=1 + clip_coeff)
+    p_loss_2 = adv * jnp.clip(ratio, min=1 - clip_coeff, max=1 + clip_coeff)
     p_loss = -jnp.mean(jnp.minimum(p_loss_1, p_loss_2), axis=0)
 
     # Value Loss
     v_loss_unclipped = jnp.square(new_value - batch.returns)
     v_loss_clipped = batch.value + jnp.clip(
-        new_value - batch.value, a_min=-clip_coeff, a_max=clip_coeff
+        new_value - batch.value, min=-clip_coeff, max=clip_coeff
     )
     v_loss_clipped = jnp.square(v_loss_clipped - batch.returns)
     v_loss = jnp.maximum(v_loss_unclipped, v_loss_clipped)
