@@ -158,7 +158,7 @@ def test_policy(
     )
 
     burn_in = static_kwargs["burn_in"]
-    state_ts = jax.tree_util.tree_map(lambda x: x.at[burn_in:].get(), state_ts)
+    state_ts = jax.tree.map(lambda x: x.at[burn_in:].get(), state_ts)
 
     return state_ts, reward_ts.at[burn_in:].get(), info_ts
 

@@ -20,7 +20,7 @@ def policy_update(
 ) -> typing.Tuple[Agent, jnp.array]:
 
     n_batches = batch.action.shape[0] // batch_size
-    batches = jax.tree_util.tree_map(
+    batches = jax.tree.map(
         lambda x: x.reshape((n_batches, batch_size) + x.shape[1:]), batch
     )
 
@@ -79,7 +79,7 @@ def train_step(
         _key, _agent = carry
         _key, _sub_key = jax.random.split(_key)
         _idxs = jax.random.choice(_sub_key, batch_size, (n_samples,), replace=False)
-        _batch = jax.tree_util.tree_map(lambda y: y.at[_idxs].get(), batch)
+        _batch = jax.tree.map(lambda y: y.at[_idxs].get(), batch)
 
         _agent, _losses = policy_update(
             agent=_agent,
@@ -94,7 +94,7 @@ def train_step(
         _inner_update, (key, agent), None, length=update_epochs
     )
 
-    losses = jax.tree_util.tree_map(jnp.ravel, losses)
+    losses = jax.tree.map(jnp.ravel, losses)
 
     return key, agent, losses
 
@@ -138,8 +138,10 @@ def train_step_with_refresh(
 
         prepare_batch = partial(prepare_batch_func, **static_kwargs)
 
-        batches = jax.vmap(prepare_batch, in_axes=(None, 0))(ppo_params, trajectories)
-        batches = jax.tree_util.tree_map(
+        batches = jax.vmap(prepare_batch, in_axes=(None, None, 0))(
+            ppo_params, _agent, trajectories
+        )
+        batches = jax.tree.map(
             lambda x: jnp.reshape(x, (np.prod(x.shape[:2]),) + x.shape[2:]), batches
         )
         batch_size = batches.state.shape[0]
@@ -147,7 +149,7 @@ def train_step_with_refresh(
         n_samples = min(n_samples, max_mini_batches * mini_batch_size)
 
         _idxs = jax.random.choice(_sub_key, batch_size, (n_samples,), replace=False)
-        _batch = jax.tree_util.tree_map(lambda y: y.at[_idxs].get(), batches)
+        _batch = jax.tree.map(lambda y: y.at[_idxs].get(), batches)
 
         _agent, _losses = policy_update(
             agent=_agent,
@@ -162,6 +164,6 @@ def train_step_with_refresh(
         _inner_update, (key, agent), None, length=update_epochs
     )
 
-    losses = jax.tree_util.tree_map(jnp.ravel, losses)
+    losses = jax.tree.map(jnp.ravel, losses)
 
     return key, agent, losses

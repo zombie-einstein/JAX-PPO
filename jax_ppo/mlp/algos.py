@@ -34,7 +34,15 @@ def max_action(agent: Agent, state: chex.Array) -> chex.Array:
     return policy(agent.apply_fn, agent.params, state)[0]
 
 
-def prepare_batch(ppo_params: PPOParams, trajectories: Trajectory) -> Batch:
+def prepare_batch(
+    ppo_params: PPOParams, agent: Agent, trajectories: Trajectory
+) -> Batch:
+
+    _, _, values = jax.vmap(partial(policy, agent.apply_fn, agent.params))(
+        trajectories.state
+    )
+    trajectories = trajectories._replace(value=values)
+
     adv, returns = calculate_gae(ppo_params, trajectories)
     return Batch(
         state=trajectories.state.at[:-1].get(),
