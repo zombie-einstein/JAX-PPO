@@ -43,16 +43,23 @@ def max_action(
 
 
 def prepare_batch(
-    ppo_params: PPOParams, trajectories: LSTMTrajectory, **static_kwargs
+    ppo_params: PPOParams,
+    agent: Agent,
+    trajectories: LSTMTrajectory,
+    **kwargs,
 ) -> LSTMBatch:
-    burn_in = static_kwargs["burn_in"]
-    trajectories = jax.tree_util.tree_map(lambda x: x.at[burn_in:].get(), trajectories)
+    burn_in = kwargs["burn_in"]
+
+    _, _, values, _ = jax.vmap(
+        partial(policy, agent.apply_fn, agent.params), in_axes=(0, 0)
+    )(trajectories.state, trajectories.hidden_states)
+    trajectories = trajectories._replace(value=values)
+
+    trajectories = jax.tree.map(lambda x: x.at[burn_in:].get(), trajectories)
 
     adv, returns = calculate_gae(ppo_params, trajectories)
 
-    hidden_states = jax.tree_util.tree_map(
-        lambda x: x.at[:-1].get(), trajectories.hidden_states
-    )
+    hidden_states = jax.tree.map(lambda x: x.at[:-1].get(), trajectories.hidden_states)
 
     return LSTMBatch(
         state=trajectories.state.at[:-1].get(),

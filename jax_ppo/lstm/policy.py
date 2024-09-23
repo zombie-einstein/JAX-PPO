@@ -60,11 +60,14 @@ class RecurrentActorCritic(linen.Module):
 
 
 def initialise_carry(
-    n_layers: int, batch_dims: typing.Tuple[int, ...], hidden_size: int
+    n_layers: int,
+    batch_dims: typing.Tuple[int, ...],
+    hidden_size: int,
+    zeros: bool = True,
 ) -> HiddenStates:
     k = jax.random.PRNGKey(0)
 
-    return tuple(
+    states = tuple(
         [
             linen.OptimizedLSTMCell(features=hidden_size).initialize_carry(
                 k, batch_dims + (hidden_size,)
@@ -72,3 +75,8 @@ def initialise_carry(
             for _ in range(n_layers)
         ]
     )
+
+    if zeros:
+        states = jax.tree.map(lambda x: jnp.zeros_like(x), states)
+
+    return states

@@ -138,7 +138,9 @@ def train_step_with_refresh(
 
         prepare_batch = partial(prepare_batch_func, **static_kwargs)
 
-        batches = jax.vmap(prepare_batch, in_axes=(None, 0))(ppo_params, trajectories)
+        batches = jax.vmap(prepare_batch, in_axes=(None, None, 0))(
+            ppo_params, _agent, trajectories
+        )
         batches = jax.tree_util.tree_map(
             lambda x: jnp.reshape(x, (np.prod(x.shape[:2]),) + x.shape[2:]), batches
         )
