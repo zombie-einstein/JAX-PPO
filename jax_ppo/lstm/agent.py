@@ -24,7 +24,7 @@ def init_lstm_agent(
     activation: linen.activation = linen.tanh,
 ) -> typing.Tuple[jax.random.PRNGKey, Agent]:
 
-    observation_size = np.prod(observation_space_shape)
+    observation_size = int(np.prod(observation_space_shape))
 
     policy = RecurrentActorCritic(
         layer_width=layer_width,
